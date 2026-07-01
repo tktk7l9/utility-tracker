@@ -4,19 +4,20 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Trash2, Pencil, Check, X, Download } from "lucide-react";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UTILITIES, type NewReading, type Reading } from "@/lib/domain";
-import { summarize, toMonthlySeries, trimIncompleteEnds } from "@/lib/aggregate";
+import { toMonthlySeries, trimIncompleteEnds } from "@/lib/aggregate";
 import { readingKey } from "@/lib/csv";
 import { toCsv, toExportJson, exportFilename } from "@/lib/export";
 import { bulkUpsert, deleteReading, fetchReadings, insertReading, updateReading } from "@/lib/supabase";
 import { formatYen } from "@/lib/utils";
 
 import { SummaryCards } from "./SummaryCards";
+import { ProviderLinks } from "./ProviderLinks";
 import { StatsStrip } from "./StatsStrip";
 import { CompositionCard } from "./CompositionCard";
 import { CostChart } from "./CostChart";
@@ -54,7 +55,6 @@ export function Dashboard() {
 
   const rawMonthly = useMemo(() => toMonthlySeries(readings), [readings]);
   const monthly = useMemo(() => trimIncompleteEnds(rawMonthly), [rawMonthly]);
-  const summary = useMemo(() => summarize(monthly), [monthly]);
   const existingKeys = useMemo(() => readings.map(readingKey), [readings]);
   const trimmedCount = rawMonthly.length - monthly.length;
 
@@ -103,7 +103,7 @@ export function Dashboard() {
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
-        <SummaryCards summary={summary} />
+        <SummaryCards monthly={monthly} />
         <StatsStrip data={monthly} />
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
@@ -146,6 +146,16 @@ export function Dashboard() {
       </TabsContent>
 
       <TabsContent value="entry" className="grid gap-4 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">各社の料金ページ</CardTitle>
+            <CardDescription>明細の確認・CSV ダウンロードはこちらから（別タブで開きます）。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProviderLinks />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">手入力</CardTitle>
