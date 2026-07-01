@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSession, isConfigured, onAuthChange, signIn, signOut } from "@/lib/supabase";
+import { getSession, isConfigured, onAuthChange, signIn } from "@/lib/supabase";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [configured] = useState(() => isConfigured());
@@ -60,18 +59,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return <SignInForm />;
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
-        <span>{session.user.email}</span>
-        <Button variant="ghost" size="sm" onClick={() => signOut()}>
-          <LogOut className="size-4" />
-          ログアウト
-        </Button>
-      </div>
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
 
 function SignInForm() {
