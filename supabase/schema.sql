@@ -15,7 +15,9 @@ create table if not exists public.readings (
   user_id      uuid not null references auth.users(id) default auth.uid(), -- 所有者（RLS）
   created_at   timestamptz not null default now(),
   -- CSV の再取込・重複入力を冪等にするためのユニーク制約（bulkUpsert の onConflict 先）。
-  unique (utility, period_start, period_end)
+  -- user_id を含めて「所有者ごとの一意」にする（グローバル一意だと複数ユーザー時に
+  -- 他人の同一期間行と衝突し、upsert が RLS 不可視の行を更新しようとして失敗する）。
+  constraint readings_owner_period_key unique (user_id, utility, period_start, period_end)
 );
 
 -- 期間終了日での並び替え・絞り込みを高速化。

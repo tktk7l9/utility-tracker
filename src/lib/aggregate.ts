@@ -95,6 +95,14 @@ export function monthCovered(coverage: Array<[number, number]>, monthKey: string
   return coverage.some(([a, b]) => a <= first && b >= last);
 }
 
+/** 結合済み区間が "YYYY-MM" の月と1日でも重なるか（部分的な接触を含む）。 */
+export function monthOverlaps(coverage: Array<[number, number]>, monthKey: string): boolean {
+  const [y, m] = monthKey.split("-").map(Number);
+  const first = Date.UTC(y, m - 1, 1);
+  const last = Date.UTC(y, m, 0);
+  return coverage.some(([a, b]) => a <= last && b >= first);
+}
+
 /**
  * レコード群を月次バケットの昇順配列に集計する。各期間の金額・使用量は日割りで
  * カレンダー月に按分される。
@@ -134,8 +142,14 @@ export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
     else coverage.set(r.utility, [[s, e]]);
   }
   for (const [u, iv] of coverage) coverage.set(u, mergeIntervals(iv));
+  // その月に検針期間が「重なる」光熱費だけ、全体カバーを要求する。
+  // まだ検針が届いていない（＝その月に重ならない）光熱費は not-present 扱いにし、
+  // 更新頻度の違い（例: 電気は毎月／水道は隔月）で直近月が不完全判定→trim される事故を防ぐ。
   for (const bucket of sorted) {
-    bucket.complete = [...present].every((u) => monthCovered(coverage.get(u)!, bucket.month));
+    bucket.complete = [...present].every((u) => {
+      const cov = coverage.get(u)!;
+      return !monthOverlaps(cov, bucket.month) || monthCovered(cov, bucket.month);
+    });
   }
 
   return sorted;

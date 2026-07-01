@@ -34,8 +34,8 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
     setError(null);
     setOk(false);
     const amountYen = Number(amount);
-    if (!Number.isFinite(amountYen) || amount === "") {
-      setError("金額を入力してください。");
+    if (amount === "" || !Number.isFinite(amountYen) || amountYen < 0) {
+      setError("金額は0以上の数値で入力してください。");
       return;
     }
     if (periodEnd < periodStart) {
@@ -43,8 +43,8 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
       return;
     }
     const usageValue = usage === "" ? null : Number(usage);
-    if (usageValue != null && !Number.isFinite(usageValue)) {
-      setError("使用量が数値ではありません。");
+    if (usageValue != null && (!Number.isFinite(usageValue) || usageValue < 0)) {
+      setError("使用量は0以上の数値で入力してください。");
       return;
     }
 
@@ -82,6 +82,7 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
               key={u}
               type="button"
               onClick={() => setUtility(u)}
+              aria-pressed={u === utility}
               className={
                 "rounded-md border px-3 py-1.5 text-sm transition-colors " +
                 (u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent")

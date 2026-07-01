@@ -228,6 +228,7 @@ function RecordList({
   }
 
   async function remove(id: string) {
+    if (!window.confirm("このレコードを削除します。元に戻せません。よろしいですか？")) return;
     setPendingId(id);
     try {
       await onDelete(id);
@@ -338,8 +339,8 @@ function EditRow({
   async function save() {
     setErr(null);
     const amountYen = Number(amount);
-    if (amount === "" || !Number.isFinite(amountYen)) {
-      setErr("金額が不正です。");
+    if (amount === "" || !Number.isFinite(amountYen) || amountYen < 0) {
+      setErr("金額は0以上の数値で入力してください。");
       return;
     }
     if (periodEnd < periodStart) {
@@ -347,8 +348,8 @@ function EditRow({
       return;
     }
     const usageValue = usage === "" ? null : Number(usage);
-    if (usageValue != null && !Number.isFinite(usageValue)) {
-      setErr("使用量が数値ではありません。");
+    if (usageValue != null && (!Number.isFinite(usageValue) || usageValue < 0)) {
+      setErr("使用量は0以上の数値で入力してください。");
       return;
     }
     setBusy(true);

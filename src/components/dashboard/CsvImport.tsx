@@ -6,8 +6,9 @@ import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { UTILITIES, UTILITY_ORDER, type NewReading, type Utility } from "@/lib/domain";
-import { parseCsv, mapRowsToReadings, dedupe, type CsvMapping } from "@/lib/csv";
+import { parseCsv, mapRowsToReadings, dedupe, readingKey, type CsvMapping } from "@/lib/csv";
 import { formatYen } from "@/lib/utils";
 
 const selectClass =
@@ -51,8 +52,10 @@ export function CsvImport({
 }) {
   const [rawText, setRawText] = useState("");
   const [encoding, setEncoding] = useState("utf-8");
+  const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
   const [utility, setUtility] = useState<Utility>("electricity");
   const [hasHeader, setHasHeader] = useState(true);
+  const [overwrite, setOverwrite] = useState(false);
   const [colEnd, setColEnd] = useState(0);
   const [colAmount, setColAmount] = useState(1);
   const [colStart, setColStart] = useState<number | null>(null);
@@ -63,6 +66,7 @@ export function CsvImport({
 
   const rows = useMemo(() => parseCsv(rawText), [rawText]);
   const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+  const existingSet = useMemo(() => new Set(existingKeys), [existingKeys]);
 
   function applyDefaults(parsed: string[][]) {
     const cols = parsed.reduce((m, r) => Math.max(m, r.length), 0);
@@ -74,17 +78,35 @@ export function CsvImport({
     setError(null);
   }
 
+  /** バッファを指定エンコーディングでデコードして反映する。resetCols=true で列既定を初期化。 */
+  function decodeAndLoad(buf: ArrayBuffer, enc: string, resetCols: boolean) {
+    const text = new TextDecoder(enc).decode(buf);
+    setRawText(text);
+    if (resetCols) {
+      applyDefaults(parseCsv(text));
+    } else {
+      // 文字コード切替時は既に設定した列マッピングを保持する（構造は同じ）。
+      setDone(null);
+      setError(null);
+    }
+  }
+
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const buf = await file.arrayBuffer();
-      const text = new TextDecoder(encoding).decode(buf);
-      setRawText(text);
-      applyDefaults(parseCsv(text));
+      setBuffer(buf);
+      decodeAndLoad(buf, encoding, true);
     } catch {
       setError("ファイルを読み込めませんでした。エンコーディングを確認してください。");
     }
+  }
+
+  // 文字コードを切り替えたら、選択済みファイルを列マッピングを保ったまま再デコードする。
+  function onEncodingChange(enc: string) {
+    setEncoding(enc);
+    if (buffer) decodeAndLoad(buffer, enc, false);
   }
 
   const mapping: CsvMapping = {
@@ -103,7 +125,9 @@ export function CsvImport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, utility, hasHeader, colEnd, colAmount, colStart, colUsage]
   );
-  const { toInsert, duplicates } = dedupe(parsed.readings, existingKeys);
+  // 上書きモードでは既存キーを除外せず、ファイル内重複だけ畳む（bulkUpsert が upsert で上書き）。
+  const { toInsert, duplicates } = dedupe(parsed.readings, overwrite ? [] : existingKeys);
+  const overwriteCount = overwrite ? toInsert.filter((r) => existingSet.has(readingKey(r))).length : 0;
 
   const headerLabel = (i: number): string => (hasHeader && rows[0]?.[i] ? rows[0][i] : `列${i + 1}`);
 
@@ -132,6 +156,7 @@ export function CsvImport({
                 key={u}
                 type="button"
                 onClick={() => setUtility(u)}
+                aria-pressed={u === utility}
                 className={
                   "rounded-md border px-3 py-1.5 text-sm transition-colors " +
                   (u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent")
@@ -145,14 +170,14 @@ export function CsvImport({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="enc">文字コード</Label>
-          <select id="enc" className={selectClass} value={encoding} onChange={(e) => setEncoding(e.target.value)}>
+          <select id="enc" className={selectClass} value={encoding} onChange={(e) => onEncodingChange(e.target.value)}>
             <option value="utf-8">UTF-8</option>
             <option value="shift_jis">Shift_JIS</option>
           </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="file">CSV ファイル</Label>
-          <Input file id="file" onChange={onFile} />
+          <Input type="file" accept=".csv,text/csv" id="file" onChange={onFile} className="h-9 file:mr-3 file:rounded file:bg-secondary file:px-2 file:py-1" />
         </div>
       </div>
 
@@ -162,6 +187,10 @@ export function CsvImport({
             <label className="col-span-full flex items-center gap-2 text-sm">
               <input type="checkbox" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} />
               1行目はヘッダ
+            </label>
+            <label className="col-span-full flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
+              既存の同一期間レコードを上書きする（金額の訂正などを再取込する場合）
             </label>
             <div className="space-y-1">
               <Label>検針日 / 期間終了列</Label>
@@ -183,6 +212,7 @@ export function CsvImport({
 
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant="success">取込 {toInsert.length} 件</Badge>
+            {overwriteCount > 0 && <Badge variant="secondary">うち上書き {overwriteCount} 件</Badge>}
             {duplicates.length > 0 && <Badge variant="secondary">重複スキップ {duplicates.length} 件</Badge>}
             {parsed.errors.length > 0 && <Badge variant="destructive">エラー {parsed.errors.length} 件</Badge>}
           </div>
@@ -217,7 +247,11 @@ export function CsvImport({
 
           <Button onClick={runImport} disabled={busy || toInsert.length === 0}>
             <Upload className="size-4" />
-            {busy ? "取込中…" : `${toInsert.length} 件を取り込む`}
+            {busy
+              ? "取込中…"
+              : overwriteCount > 0
+                ? `${toInsert.length} 件を取り込む（上書き ${overwriteCount} 件）`
+                : `${toInsert.length} 件を取り込む`}
           </Button>
         </>
       )}
@@ -225,20 +259,5 @@ export function CsvImport({
       {error && <p className="text-sm text-destructive">{error}</p>}
       {done != null && <p className="text-sm text-success">{done} 件を取り込みました。</p>}
     </div>
-  );
-}
-
-// ファイル入力は shadcn Input の file バリアント風。
-function Input({ file, className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { file?: boolean }) {
-  return (
-    <input
-      type={file ? "file" : "text"}
-      accept={file ? ".csv,text/csv" : undefined}
-      className={
-        "flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-sm " +
-        (className ?? "")
-      }
-      {...props}
-    />
   );
 }

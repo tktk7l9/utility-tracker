@@ -121,12 +121,15 @@ export async function insertReading(reading: NewReading): Promise<Reading> {
   return rowToReading(data as Row);
 }
 
-/** unique(utility, period_start, period_end) で衝突したら上書き（冪等な再取込）。 */
+/**
+ * unique(user_id, utility, period_start, period_end) で衝突したら上書き（冪等な再取込）。
+ * user_id は挿入行の default auth.uid() で埋まるため、ペイロードには含めない。
+ */
 export async function bulkUpsert(readings: NewReading[]): Promise<void> {
   if (readings.length === 0) return;
   const { error } = await requireClient()
     .from(TABLE)
-    .upsert(readings.map(newReadingToRow), { onConflict: "utility,period_start,period_end" });
+    .upsert(readings.map(newReadingToRow), { onConflict: "user_id,utility,period_start,period_end" });
   if (error) throw new Error(error.message);
 }
 

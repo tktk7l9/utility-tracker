@@ -8,6 +8,7 @@ import {
   trimIncompleteEnds,
   mergeIntervals,
   monthCovered,
+  monthOverlaps,
   unitPrice,
   usageSeriesFor,
   yoyByMonth,
@@ -151,6 +152,21 @@ describe("monthCovered", () => {
   });
 });
 
+describe("monthOverlaps", () => {
+  const cov: Array<[number, number]> = [[Date.UTC(2026, 2, 1), Date.UTC(2026, 3, 30)]]; // 3/1〜4/30
+  it("1日でも重なれば true", () => {
+    expect(monthOverlaps(cov, "2026-03")).toBe(true);
+    expect(monthOverlaps(cov, "2026-04")).toBe(true);
+  });
+  it("重ならない月は false", () => {
+    expect(monthOverlaps(cov, "2026-02")).toBe(false);
+    expect(monthOverlaps(cov, "2026-05")).toBe(false);
+  });
+  it("カバレッジ空は false", () => {
+    expect(monthOverlaps([], "2026-03")).toBe(false);
+  });
+});
+
 describe("完全性 (complete) と trimIncompleteEnds", () => {
   it("端の部分月を incomplete、内側を complete に判定する", () => {
     const readings = [
@@ -164,6 +180,31 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
       ["2025-08", false],
     ]);
     expect(trimIncompleteEnds(series).map((b) => b.month)).toEqual(["2025-07"]);
+  });
+
+  it("更新頻度の違う光熱費があっても、その月に重ならなければ完全と判定する", () => {
+    const readings = [
+      // 電気は毎月フルカバー（5月・6月）。
+      reading({ utility: "electricity", periodStart: "2026-05-01", periodEnd: "2026-05-31", amountYen: 3000, usageValue: 100 }),
+      reading({ utility: "electricity", periodStart: "2026-06-01", periodEnd: "2026-06-30", amountYen: 3200, usageValue: 105 }),
+      // 水道は隔月で 3〜4 月まで（5・6 月は未検針）。
+      reading({ utility: "water", periodStart: "2026-03-01", periodEnd: "2026-04-30", amountYen: 6000, usageValue: 24, usageUnit: "m³" }),
+    ];
+    const series = toMonthlySeries(readings);
+    const jun = series.find((b) => b.month === "2026-06")!;
+    // 旧ロジックでは water 未カバーで false → 直近月が trim されて消えていた。
+    expect(jun.complete).toBe(true);
+    expect(series.every((b) => b.complete)).toBe(true);
+    expect(trimIncompleteEnds(series).some((b) => b.month === "2026-06")).toBe(true);
+  });
+
+  it("端の部分月は、その光熱費が月に重なりつつ覆いきれないので incomplete のまま", () => {
+    // 電気が月途中から開始 → その月は重なるが全体は覆えず incomplete。
+    const series = toMonthlySeries([
+      reading({ utility: "electricity", periodStart: "2026-06-15", periodEnd: "2026-07-31", amountYen: 3000, usageValue: 100 }),
+    ]);
+    expect(series.find((b) => b.month === "2026-06")!.complete).toBe(false);
+    expect(series.find((b) => b.month === "2026-07")!.complete).toBe(true);
   });
 
   it("全て complete ならトリムしない・空はそのまま", () => {

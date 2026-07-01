@@ -80,6 +80,21 @@ if (ins?.id) {
   const { data: sel, error: selErr } = await supabase.from("readings").select("id,note").eq("id", ins.id).single();
   step("SELECT で読み戻し", !selErr && sel?.id === ins.id, selErr?.message);
 
+  // 同一キーで upsert → 新 unique(user_id,utility,period_start,period_end) に一致し、
+  // 重複 INSERT でなく UPDATE になることを確認する（bulkUpsert の onConflict と制約の整合）。
+  const { error: upErr } = await supabase
+    .from("readings")
+    .upsert({ ...probe, amount_yen: 2 }, { onConflict: "user_id,utility,period_start,period_end" });
+  step("同一キー upsert（onConflict が新 unique 制約に一致）", !upErr, upErr?.message);
+
+  const { data: dup } = await supabase
+    .from("readings")
+    .select("id,amount_yen")
+    .eq("utility", probe.utility)
+    .eq("period_start", probe.period_start)
+    .eq("period_end", probe.period_end);
+  step("upsert が重複を作らず上書き（1件・金額更新）", (dup?.length ?? 0) === 1 && dup?.[0]?.amount_yen === 2);
+
   const { error: delErr } = await supabase.from("readings").delete().eq("id", ins.id);
   step("後始末 DELETE", !delErr, delErr?.message);
 }
