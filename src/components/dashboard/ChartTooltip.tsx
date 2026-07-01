@@ -1,5 +1,41 @@
 "use client";
 
+/**
+ * ReferenceLine 用のラベル。背景色の縁取り（halo）を付けて、グリッドやバーの上でも
+ * テキストが読みやすいようにする。viewBox は recharts が注入する。
+ */
+export function RefLineLabel({
+  viewBox,
+  text,
+  color = "var(--foreground)",
+  align = "right",
+}: {
+  viewBox?: { x: number; y: number; width: number; height: number };
+  text: string;
+  color?: string;
+  align?: "left" | "right";
+}) {
+  if (!viewBox) return null;
+  const x = align === "right" ? viewBox.x + viewBox.width - 4 : viewBox.x + 4;
+  const y = viewBox.y - 5;
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={align === "right" ? "end" : "start"}
+      fontSize={11}
+      fontWeight={600}
+      fill={color}
+      stroke="var(--card)"
+      strokeWidth={3.5}
+      paintOrder="stroke"
+      strokeLinejoin="round"
+    >
+      {text}
+    </text>
+  );
+}
+
 interface TooltipEntry {
   name?: string;
   value?: number | string;

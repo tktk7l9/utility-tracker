@@ -13,10 +13,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-import { UTILITIES, UTILITY_ORDER } from "@/lib/domain";
+import { HOUSEHOLD_AVERAGE, UTILITIES, UTILITY_ORDER } from "@/lib/domain";
 import { monthLabel, type MonthlyBucket } from "@/lib/aggregate";
 import { formatYen } from "@/lib/utils";
-import { ChartTooltip } from "./ChartTooltip";
+import { ChartTooltip, RefLineLabel } from "./ChartTooltip";
 
 function shortMonth(month: string): string {
   const [y, m] = month.split("-");
@@ -66,17 +66,24 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
         <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
         <XAxis dataKey="month" tickFormatter={shortMonth} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
         <YAxis
-          tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+          tickFormatter={(v: number) => v.toLocaleString("ja-JP")}
           tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
           axisLine={false}
           tickLine={false}
-          width={40}
+          width={56}
+        />
+        <ReferenceLine
+          y={HOUSEHOLD_AVERAGE.total}
+          stroke="#7c3aed"
+          strokeDasharray="5 4"
+          label={<RefLineLabel text={`一般家庭 目安 ${formatYen(HOUSEHOLD_AVERAGE.total)}`} color="#7c3aed" align="left" />}
         />
         <ReferenceLine
           y={avg}
-          stroke="var(--muted-foreground)"
+          stroke="var(--foreground)"
+          strokeOpacity={0.5}
           strokeDasharray="5 4"
-          label={{ value: `平均 ${formatYen(avg)}`, position: "insideTopRight", fontSize: 11, fill: "var(--muted-foreground)" }}
+          label={<RefLineLabel text={`平均 ${formatYen(avg)}`} align="right" />}
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.4 }}

@@ -18,7 +18,7 @@ import { UTILITIES, UTILITY_ORDER, type Utility } from "@/lib/domain";
 import { monthLabel, usageSeriesFor } from "@/lib/aggregate";
 import type { Reading } from "@/lib/domain";
 import { cn, formatNumber, formatYen } from "@/lib/utils";
-import { ChartTooltip } from "./ChartTooltip";
+import { ChartTooltip, RefLineLabel } from "./ChartTooltip";
 
 function shortMonth(month: string): string {
   const [y, m] = month.split("-");
@@ -86,9 +86,9 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
                 yAxisId="price"
                 y={avgPrice}
                 stroke="var(--foreground)"
-                strokeOpacity={0.35}
+                strokeOpacity={0.4}
                 strokeDasharray="5 4"
-                label={{ value: `平均単価 ¥${Math.round(avgPrice)}`, position: "insideBottomRight", fontSize: 11, fill: "var(--muted-foreground)" }}
+                label={<RefLineLabel text={`平均単価 ¥${Math.round(avgPrice)}`} align="right" />}
               />
             )}
             <Tooltip

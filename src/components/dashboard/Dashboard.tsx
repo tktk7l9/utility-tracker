@@ -112,8 +112,13 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <CostChart data={monthly} />
-              {trimmedCount > 0 && (
+              {monthly.length > 0 && (
                 <p className="mt-2 text-xs text-muted-foreground">
+                  紫の点線は一般家庭（二人以上世帯）の月平均光熱費の目安（家計調査ベースの概算）。
+                </p>
+              )}
+              {trimmedCount > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
                   ※ データ端の部分月（検針期間が月全体を覆わない {trimmedCount} 月）は、合計が過小に見えるため比較グラフから除外しています。
                 </p>
               )}

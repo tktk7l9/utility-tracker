@@ -73,3 +73,14 @@ export function utilityMeta(u: Utility): UtilityMeta {
 export function isUtility(v: string): v is Utility {
   return v === "electricity" || v === "gas" || v === "water";
 }
+
+/**
+ * 一般家庭（二人以上世帯）の月あたり平均光熱費の目安（円・概算）。
+ * 総務省「家計調査」ベースのおおよその値で、比較用の参考ライン専用。
+ */
+export const HOUSEHOLD_AVERAGE = {
+  electricity: 12000,
+  gas: 5000,
+  water: 5000,
+  total: 22000,
+} as const;

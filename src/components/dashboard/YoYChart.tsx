@@ -70,11 +70,11 @@ export function YoYChart({ data }: { data: MonthlyBucket[] }) {
             <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
             <YAxis
-              tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+              tickFormatter={(v: number) => v.toLocaleString("ja-JP")}
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
               axisLine={false}
               tickLine={false}
-              width={40}
+              width={56}
             />
             <Tooltip
               cursor={{ fill: "var(--muted)", opacity: 0.4 }}
