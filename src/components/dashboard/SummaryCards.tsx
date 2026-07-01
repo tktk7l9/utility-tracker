@@ -46,50 +46,54 @@ export function SummaryCards({ monthly }: { monthly: MonthlyBucket[] }) {
     <div className="space-y-3">
       <Card>
         <CardContent className="p-5">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
             <div className="min-w-0">
               <p className="text-sm text-muted-foreground">{monthLabel(latestMonth)}の合計</p>
-              <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{formatYen(latest.total)}</p>
+              <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-3xl">
+                {formatYen(latest.total)}
+              </p>
               {yoyDelta != null && (
-                <p className={`mt-1 flex items-center gap-1 text-sm ${trendClass}`}>
-                  <Trend className="size-4" />
+                <p className={`mt-1.5 flex items-center gap-1 text-sm ${trendClass}`}>
+                  <Trend className="size-4 shrink-0" />
                   前年同月比 {signedYen(yoyDelta)}
                   {yoyPct != null && <span className="text-muted-foreground">（{formatPercent(yoyPct)}）</span>}
                 </p>
               )}
             </div>
 
-            <dl className="grid grid-cols-3 gap-x-6 gap-y-1 border-t pt-4 text-right sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+            <dl className="grid grid-cols-3 gap-x-2 border-t pt-4 text-left sm:shrink-0 sm:gap-x-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 sm:text-right">
               <div>
                 <dt className="text-xs text-muted-foreground">1日あたり</dt>
-                <dd className="mt-0.5 font-medium tabular-nums">{formatYen(perDay)}</dd>
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{formatYen(perDay)}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">前月比</dt>
-                <dd className="mt-0.5 font-medium tabular-nums">
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">
                   {momDelta != null ? signedYen(momDelta) : "—"}
-                  {momPct != null && <span className="ml-1 text-xs text-muted-foreground">{formatPercent(momPct)}</span>}
+                  {momPct != null && (
+                    <span className="block text-xs font-normal text-muted-foreground">{formatPercent(momPct)}</span>
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">月平均比</dt>
-                <dd className="mt-0.5 font-medium tabular-nums">{signedYen(vsAvg)}</dd>
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{signedYen(vsAvg)}</dd>
               </div>
             </dl>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {UTILITY_ORDER.map((u) => (
           <Card key={u}>
-            <CardContent className="p-5">
+            <CardContent className="p-4 sm:p-5">
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
+                <span className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
                 {UTILITIES[u].label}
               </p>
-              <p className="mt-1 flex items-baseline gap-2">
-                <span className="text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                <span className="whitespace-nowrap text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
                 {latest.total > 0 && (
                   <span className="text-xs text-muted-foreground tabular-nums">
                     {((latest[u] / latest.total) * 100).toFixed(0)}%
