@@ -30,3 +30,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# 実消費データを含む取込スクリプトはローカル限定（公開しない）
+scripts/import-*.mjs
