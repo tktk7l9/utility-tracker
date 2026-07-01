@@ -76,6 +76,12 @@ describe("normalizeDate", () => {
     expect(normalizeDate("２０２６/０６/１９")).toBe("2026-06-19");
     expect(normalizeDate("2026.6.1")).toBe("2026-06-01");
   });
+  it("2桁年は 20xx として解釈（LPIO「26年06月」形式）", () => {
+    expect(normalizeDate("26年06月")).toBe("2026-06-01");
+    expect(normalizeDate("25年12月")).toBe("2025-12-01");
+    expect(normalizeDate("26/6/1")).toBe("2026-06-01");
+    expect(normalizeDate("00年01月")).toBe("2000-01-01");
+  });
   it("解釈不能・範囲外・null は null", () => {
     expect(normalizeDate("")).toBeNull();
     expect(normalizeDate(null)).toBeNull();
@@ -123,6 +129,30 @@ describe("mapRowsToReadings", () => {
       usageUnit: "kWh",
       source: "csv",
     });
+  });
+
+  it("LPIO「1年間の使用実績」形式（2桁年・¥金額）を取り込める", () => {
+    const rows = [
+      ["年月", "使用量", "ご利用金額"],
+      ["26年06月", "22.0", "¥4,331"],
+      ["25年07月", "17.0", "¥3,625"],
+    ];
+    const { readings, errors } = mapRowsToReadings(rows, {
+      utility: "gas",
+      hasHeader: true,
+      columns: { periodEnd: 0, usage: 1, amount: 2 },
+    });
+    expect(errors).toEqual([]);
+    expect(readings[0]).toMatchObject({
+      utility: "gas",
+      provider: "LPIO",
+      periodStart: "2026-06-01",
+      periodEnd: "2026-06-30",
+      amountYen: 4331,
+      usageValue: 22,
+      usageUnit: "m³",
+    });
+    expect(readings[1]).toMatchObject({ periodStart: "2025-07-01", periodEnd: "2025-07-31", amountYen: 3625 });
   });
 
   it("開始・終了の両列指定 → 期間そのまま。provider/unit も上書きできる", () => {

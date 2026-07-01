@@ -103,10 +103,12 @@ export function normalizeDate(raw: string | null | undefined): string | null {
     .map((p) => p.trim())
     .filter((p) => p !== "");
   if (parts.length < 2) return null;
-  const y = Number(parts[0]);
+  let y = Number(parts[0]);
   const m = Number(parts[1]);
   const d = parts.length >= 3 ? Number(parts[2]) : 1;
   if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  // 2桁年（LPIO「26年06月」等）は 20xx として解釈する。
+  if (y < 100) y += 2000;
   if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1 || d > 31) return null;
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
