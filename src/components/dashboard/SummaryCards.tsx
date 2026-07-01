@@ -27,8 +27,8 @@ export function SummaryCards({ summary }: { summary: Summary }) {
   const trendClass = up ? "text-destructive" : down ? "text-success" : "text-muted-foreground";
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Card className="lg:col-span-2">
+    <div className="space-y-3">
+      <Card>
         <CardContent className="p-5">
           <p className="text-sm text-muted-foreground">{monthLabel(latestMonth)}の合計</p>
           <p className="mt-1 text-3xl font-semibold tracking-tight">{formatYen(latest.total)}</p>
@@ -43,29 +43,31 @@ export function SummaryCards({ summary }: { summary: Summary }) {
         </CardContent>
       </Card>
 
-      {UTILITY_ORDER.map((u) => (
-        <Card key={u}>
-          <CardContent className="p-5">
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
-              {UTILITIES[u].label}
-            </p>
-            <p className="mt-1 flex items-baseline gap-2">
-              <span className="text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
-              {latest.total > 0 && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {((latest[u] / latest.total) * 100).toFixed(0)}%
-                </span>
-              )}
-            </p>
-            {latest.usage[u] > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {latest.usage[u].toLocaleString("ja-JP", { maximumFractionDigits: 1 })} {UTILITIES[u].unit}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {UTILITY_ORDER.map((u) => (
+          <Card key={u}>
+            <CardContent className="p-5">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
+                {UTILITIES[u].label}
               </p>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+              <p className="mt-1 flex items-baseline gap-2">
+                <span className="text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
+                {latest.total > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {((latest[u] / latest.total) * 100).toFixed(0)}%
+                  </span>
+                )}
+              </p>
+              {latest.usage[u] > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {latest.usage[u].toLocaleString("ja-JP", { maximumFractionDigits: 1 })} {UTILITIES[u].unit}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

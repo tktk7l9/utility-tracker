@@ -23,6 +23,24 @@ function shortMonth(month: string): string {
   return `${y.slice(2)}/${m}`;
 }
 
+/** 凡例を 合計 → 電気 → ガス → 水道 の順で描画（合計は線アイコン）。 */
+function CostLegend() {
+  return (
+    <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-3 text-xs text-muted-foreground">
+      <li className="flex items-center gap-1.5">
+        <span className="inline-block h-[2px] w-3.5 rounded" style={{ backgroundColor: "var(--foreground)" }} />
+        合計
+      </li>
+      {UTILITY_ORDER.map((u) => (
+        <li key={u} className="flex items-center gap-1.5">
+          <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
+          {UTILITIES[u].label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function CostChart({ data }: { data: MonthlyBucket[] }) {
   if (data.length === 0) {
     return (
@@ -64,7 +82,7 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
           cursor={{ fill: "var(--muted)", opacity: 0.4 }}
           content={<ChartTooltip labelFormatter={(l) => monthLabel(String(l))} valueFormatter={(v) => formatYen(v)} />}
         />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+        <Legend content={<CostLegend />} />
         {UTILITY_ORDER.map((u, i) => (
           <Bar
             key={u}
