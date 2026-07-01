@@ -199,6 +199,12 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
       periodEnd = range.end;
     }
 
+    // 期間逆転（終了<開始）は集計に寄与しない“死んだ行”になるためエラーに回す。
+    if (periodEnd < periodStart) {
+      errors.push({ row: rowIndex, reason: "検針期間の終了日が開始日より前です" });
+      return;
+    }
+
     const usageValue = usageCol != null ? normalizeNumber(cells[usageCol]) : null;
 
     readings.push({

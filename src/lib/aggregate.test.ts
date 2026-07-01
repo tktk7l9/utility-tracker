@@ -5,6 +5,9 @@ import {
   monthLabel,
   daysPerMonth,
   toMonthlySeries,
+  trimIncompleteEnds,
+  mergeIntervals,
+  monthCovered,
   unitPrice,
   usageSeriesFor,
   yoyByMonth,
@@ -38,6 +41,7 @@ function bucket(month: string, total: number, parts?: Partial<MonthlyBucket>): M
     water: parts?.water ?? 0,
     total,
     usage: parts?.usage ?? { electricity: 0, gas: 0, water: 0 },
+    complete: parts?.complete ?? true,
   };
 }
 
@@ -109,6 +113,62 @@ describe("toMonthlySeries", () => {
       reading({ utility: "gas", periodStart: "2026-07-10", periodEnd: "2026-07-01", amountYen: 1000, usageValue: 5 }),
     ]);
     expect(series).toEqual([]);
+  });
+});
+
+describe("mergeIntervals", () => {
+  const D = 86_400_000;
+  it("空は空", () => {
+    expect(mergeIntervals([])).toEqual([]);
+  });
+  it("単一はそのまま", () => {
+    expect(mergeIntervals([[0, 10]])).toEqual([[0, 10]]);
+  });
+  it("未ソート＋重複を結合", () => {
+    expect(mergeIntervals([[5, 15], [0, 10]])).toEqual([[0, 15]]);
+  });
+  it("隣接（1日差）は結合", () => {
+    expect(mergeIntervals([[0, D], [2 * D, 3 * D]])).toEqual([[0, 3 * D]]);
+  });
+  it("間隔が空くと分離", () => {
+    expect(mergeIntervals([[0, D], [3 * D, 4 * D]])).toEqual([[0, D], [3 * D, 4 * D]]);
+  });
+});
+
+describe("monthCovered", () => {
+  const cov: Array<[number, number]> = [[Date.UTC(2025, 5, 17), Date.UTC(2025, 7, 18)]]; // 6/17〜8/18
+  it("月全体が覆われていれば true", () => {
+    expect(monthCovered(cov, "2025-07")).toBe(true);
+  });
+  it("部分月は false", () => {
+    expect(monthCovered(cov, "2025-06")).toBe(false);
+    expect(monthCovered(cov, "2025-08")).toBe(false);
+  });
+  it("カバレッジ空は false", () => {
+    expect(monthCovered([], "2025-07")).toBe(false);
+  });
+});
+
+describe("完全性 (complete) と trimIncompleteEnds", () => {
+  it("端の部分月を incomplete、内側を complete に判定する", () => {
+    const readings = [
+      reading({ utility: "electricity", periodStart: "2025-06-17", periodEnd: "2025-07-16", amountYen: 1000, usageValue: 100 }),
+      reading({ utility: "electricity", periodStart: "2025-07-17", periodEnd: "2025-08-18", amountYen: 1000, usageValue: 100 }),
+    ];
+    const series = toMonthlySeries(readings);
+    expect(series.map((b) => [b.month, b.complete])).toEqual([
+      ["2025-06", false],
+      ["2025-07", true],
+      ["2025-08", false],
+    ]);
+    expect(trimIncompleteEnds(series).map((b) => b.month)).toEqual(["2025-07"]);
+  });
+
+  it("全て complete ならトリムしない・空はそのまま", () => {
+    const full = toMonthlySeries([reading({ periodStart: "2025-07-01", periodEnd: "2025-07-31" })]);
+    expect(full[0].complete).toBe(true);
+    expect(trimIncompleteEnds(full)).toHaveLength(1);
+    expect(trimIncompleteEnds([])).toEqual([]);
   });
 });
 

@@ -38,7 +38,7 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
             onClick={() => setUtility(u)}
             className={cn(
               "rounded-md border px-3 py-1 text-sm transition-colors",
-              u === utility ? "border-transparent text-white" : "bg-background hover:bg-accent"
+              u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent"
             )}
             style={u === utility ? { backgroundColor: UTILITIES[u].color } : undefined}
           >

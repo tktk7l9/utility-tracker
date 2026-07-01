@@ -22,11 +22,13 @@ drop policy if exists "Enable update for all users" on public.readings;
 drop policy if exists "Enable delete for all users" on public.readings;
 drop policy if exists "anon full access" on public.readings;
 
--- 認証済みユーザーのみ全操作を許可（単一ユーザー前提のため uid 制限は不要）。
+-- 自分の行（user_id = auth.uid()）のみ全操作を許可（多重防御）。
+-- user_id は schema.sql の default auth.uid() で挿入時に自動設定される。
 drop policy if exists "authenticated full access" on public.readings;
-create policy "authenticated full access"
+drop policy if exists "own rows" on public.readings;
+create policy "own rows"
   on public.readings
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());

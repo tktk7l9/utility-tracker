@@ -134,7 +134,7 @@ export function CsvImport({
                 onClick={() => setUtility(u)}
                 className={
                   "rounded-md border px-3 py-1.5 text-sm transition-colors " +
-                  (u === utility ? "border-transparent text-white" : "bg-background hover:bg-accent")
+                  (u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent")
                 }
                 style={u === utility ? { backgroundColor: UTILITIES[u].color } : undefined}
               >

@@ -130,6 +130,29 @@ export async function bulkUpsert(readings: NewReading[]): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+const FIELD_TO_COLUMN: Record<keyof NewReading, string> = {
+  utility: "utility",
+  provider: "provider",
+  periodStart: "period_start",
+  periodEnd: "period_end",
+  amountYen: "amount_yen",
+  usageValue: "usage_value",
+  usageUnit: "usage_unit",
+  note: "note",
+  source: "source",
+};
+
+/** 指定フィールドのみ部分更新する。 */
+export async function updateReading(id: string, patch: Partial<NewReading>): Promise<Reading> {
+  const row: Record<string, unknown> = {};
+  for (const key of Object.keys(patch) as Array<keyof NewReading>) {
+    row[FIELD_TO_COLUMN[key]] = patch[key] ?? null;
+  }
+  const { data, error } = await requireClient().from(TABLE).update(row).eq("id", id).select().single();
+  if (error) throw new Error(error.message);
+  return rowToReading(data as Row);
+}
+
 export async function deleteReading(id: string): Promise<void> {
   const { error } = await requireClient().from(TABLE).delete().eq("id", id);
   if (error) throw new Error(error.message);

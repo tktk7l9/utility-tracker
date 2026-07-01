@@ -228,6 +228,17 @@ describe("mapRowsToReadings", () => {
       { row: 3, reason: "日付を解釈できません" },
     ]);
   });
+
+  it("期間逆転(終了<開始)はエラー行に回す", () => {
+    const rows = [["2026/07/31", "2026/07/01", "5000"]];
+    const { readings, errors } = mapRowsToReadings(rows, {
+      utility: "gas",
+      hasHeader: false,
+      columns: { periodStart: 0, periodEnd: 1, amount: 2 },
+    });
+    expect(readings).toHaveLength(0);
+    expect(errors).toEqual([{ row: 0, reason: "検針期間の終了日が開始日より前です" }]);
+  });
 });
 
 describe("readingKey / dedupe", () => {

@@ -12,6 +12,7 @@ create table if not exists public.readings (
   usage_unit   text,                           -- 'kWh' | 'm3' | '㎥'
   note         text,
   source       text not null default 'manual', -- 'manual' | 'csv'
+  user_id      uuid not null references auth.users(id) default auth.uid(), -- 所有者（RLS）
   created_at   timestamptz not null default now(),
   -- CSV の再取込・重複入力を冪等にするためのユニーク制約（bulkUpsert の onConflict 先）。
   unique (utility, period_start, period_end)

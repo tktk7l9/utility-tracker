@@ -53,6 +53,11 @@ export interface MonthlyBucket {
   total: number;
   /** 各光熱費の使用量（日割り按分後）。 */
   usage: Record<Utility, number>;
+  /**
+   * データが存在する全光熱費について、この月がカレンダー全体をカバーしているか。
+   * 端の月は部分月（合計が過小）になるため、比較グラフでは trimIncompleteEnds で除ける。
+   */
+  complete: boolean;
 }
 
 function emptyBucket(month: string): MonthlyBucket {
@@ -63,7 +68,31 @@ function emptyBucket(month: string): MonthlyBucket {
     water: 0,
     total: 0,
     usage: { electricity: 0, gas: 0, water: 0 },
+    complete: true,
   };
+}
+
+/** 日付区間（UTCミリ秒・両端含む）をソート＋隣接/重複を結合して返す。 */
+export function mergeIntervals(intervals: Array<[number, number]>): Array<[number, number]> {
+  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
+  for (const iv of sorted) {
+    const last = out[out.length - 1];
+    if (last && iv[0] <= last[1] + DAY_MS) {
+      last[1] = Math.max(last[1], iv[1]);
+    } else {
+      out.push([iv[0], iv[1]]);
+    }
+  }
+  return out;
+}
+
+/** 結合済み区間が "YYYY-MM" の月全体（初日〜末日）を覆っているか。 */
+export function monthCovered(coverage: Array<[number, number]>, monthKey: string): boolean {
+  const [y, m] = monthKey.split("-").map(Number);
+  const first = Date.UTC(y, m - 1, 1);
+  const last = Date.UTC(y, m, 0);
+  return coverage.some(([a, b]) => a <= first && b >= last);
 }
 
 /**
@@ -90,7 +119,38 @@ export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
     }
   }
 
-  return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+  const sorted = Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+
+  // 光熱費ごとの検針カバレッジを結合区間として求め、各月の完全性を判定する。
+  const coverage = new Map<Utility, Array<[number, number]>>();
+  const present = new Set<Utility>();
+  for (const r of readings) {
+    const s = toUTC(r.periodStart);
+    const e = toUTC(r.periodEnd);
+    if (e < s) continue;
+    present.add(r.utility);
+    const arr = coverage.get(r.utility);
+    if (arr) arr.push([s, e]);
+    else coverage.set(r.utility, [[s, e]]);
+  }
+  for (const [u, iv] of coverage) coverage.set(u, mergeIntervals(iv));
+  for (const bucket of sorted) {
+    bucket.complete = [...present].every((u) => monthCovered(coverage.get(u)!, bucket.month));
+  }
+
+  return sorted;
+}
+
+/**
+ * 系列の先頭・末尾から「不完全な月」を取り除く（内側は保持）。データ範囲の端で
+ * 部分月になり合計が過小に見えるのを防ぐ。比較系グラフ・総評はこれを通す。
+ */
+export function trimIncompleteEnds(series: MonthlyBucket[]): MonthlyBucket[] {
+  let start = 0;
+  let end = series.length;
+  while (start < end && !series[start].complete) start++;
+  while (end > start && !series[end - 1].complete) end--;
+  return series.slice(start, end);
 }
 
 /** レコードの実効単価（円/単位）。使用量が未入力または 0 なら null。 */
