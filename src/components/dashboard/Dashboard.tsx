@@ -17,6 +17,8 @@ import { bulkUpsert, deleteReading, fetchReadings, insertReading, updateReading 
 import { formatYen } from "@/lib/utils";
 
 import { SummaryCards } from "./SummaryCards";
+import { StatsStrip } from "./StatsStrip";
+import { CompositionCard } from "./CompositionCard";
 import { CostChart } from "./CostChart";
 import { UsageChart } from "./UsageChart";
 import { YoYChart } from "./YoYChart";
@@ -102,19 +104,23 @@ export function Dashboard() {
 
       <TabsContent value="overview" className="space-y-4">
         <SummaryCards summary={summary} />
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">月別料金の推移（3社積み上げ＋合計）</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CostChart data={monthly} />
-            {trimmedCount > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                ※ データ端の部分月（検針期間が月全体を覆わない {trimmedCount} 月）は、合計が過小に見えるため比較グラフから除外しています。
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <StatsStrip data={monthly} />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">月別料金の推移（3社積み上げ＋合計）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CostChart data={monthly} />
+              {trimmedCount > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  ※ データ端の部分月（検針期間が月全体を覆わない {trimmedCount} 月）は、合計が過小に見えるため比較グラフから除外しています。
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <CompositionCard data={monthly} />
+        </div>
       </TabsContent>
 
       <TabsContent value="usage">

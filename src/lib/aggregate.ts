@@ -2,7 +2,7 @@
 // 水道は隔月請求のため、各レコードの金額・使用量をカレンダー月へ「日割り按分」して
 // 月次系列に正規化する。これにより積み上げ棒グラフの月合計が正確になる。
 
-import type { Reading, Utility } from "./domain";
+import { UTILITY_ORDER, type Reading, type Utility } from "./domain";
 
 const DAY_MS = 86_400_000;
 
@@ -251,6 +251,54 @@ export interface Summary {
   yoyDelta: number | null;
   /** yoyDelta / 前年同月.total（前年同月が 0 または無ければ null）。 */
   yoyPct: number | null;
+}
+
+export interface PeriodStats {
+  /** 対象月数。 */
+  months: number;
+  /** 期間の合計支出（円）。 */
+  total: number;
+  /** 月平均支出（円・月数0なら0）。 */
+  average: number;
+  /** 合計が最大の月。 */
+  maxMonth: MonthlyBucket | null;
+  /** 合計が最小の月。 */
+  minMonth: MonthlyBucket | null;
+}
+
+/** 期間全体の合計・月平均・最高/最低月をまとめる。 */
+export function periodStats(monthly: MonthlyBucket[]): PeriodStats {
+  if (monthly.length === 0) {
+    return { months: 0, total: 0, average: 0, maxMonth: null, minMonth: null };
+  }
+  let total = 0;
+  let maxMonth = monthly[0];
+  let minMonth = monthly[0];
+  for (const b of monthly) {
+    total += b.total;
+    if (b.total > maxMonth.total) maxMonth = b;
+    if (b.total < minMonth.total) minMonth = b;
+  }
+  return { months: monthly.length, total, average: total / monthly.length, maxMonth, minMonth };
+}
+
+export interface UtilityShare {
+  utility: Utility;
+  /** 期間の当該光熱費合計（円）。 */
+  total: number;
+  /** 総支出に占める割合（0..1・総額0なら0）。 */
+  share: number;
+}
+
+/** 光熱費ごとの期間合計と構成比（ドーナツ・凡例用）。 */
+export function utilityShares(monthly: MonthlyBucket[]): UtilityShare[] {
+  const totals: Record<Utility, number> = { electricity: 0, gas: 0, water: 0 };
+  let grand = 0;
+  for (const b of monthly) {
+    for (const u of UTILITY_ORDER) totals[u] += b[u];
+    grand += b.total;
+  }
+  return UTILITY_ORDER.map((u) => ({ utility: u, total: totals[u], share: grand ? totals[u] / grand : 0 }));
 }
 
 /** 直近月の合計と、前年同月比デルタ・増減率を返す。 */

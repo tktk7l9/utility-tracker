@@ -13,6 +13,8 @@ import {
   yoyByMonth,
   seasonalAverages,
   summarize,
+  periodStats,
+  utilityShares,
   totalMetric,
   amountMetric,
   type MonthlyBucket,
@@ -228,6 +230,33 @@ describe("seasonalAverages", () => {
     expect(seasonal[5]).toMatchObject({ monthNum: 6, average: 5500, count: 2 });
     expect(seasonal[6]).toMatchObject({ average: 3000, count: 1 });
     expect(seasonal[0]).toMatchObject({ average: 0, count: 0 });
+  });
+});
+
+describe("periodStats", () => {
+  it("空はゼロ・null", () => {
+    expect(periodStats([])).toEqual({ months: 0, total: 0, average: 0, maxMonth: null, minMonth: null });
+  });
+  it("合計・月平均・最高/最低月を求める", () => {
+    const monthly = [bucket("2025-06", 5000), bucket("2025-07", 3000), bucket("2025-08", 8000)];
+    const s = periodStats(monthly);
+    expect(s.months).toBe(3);
+    expect(s.total).toBe(16000);
+    expect(s.average).toBeCloseTo(16000 / 3, 6);
+    expect(s.maxMonth?.month).toBe("2025-08");
+    expect(s.minMonth?.month).toBe("2025-07");
+  });
+});
+
+describe("utilityShares", () => {
+  it("光熱費別の合計と構成比（総額0は share 0）", () => {
+    expect(utilityShares([]).every((x) => x.total === 0 && x.share === 0)).toBe(true);
+    const shares = utilityShares([bucket("2026-06", 10000, { electricity: 6000, gas: 3000, water: 1000 })]);
+    expect(shares).toEqual([
+      { utility: "electricity", total: 6000, share: 0.6 },
+      { utility: "gas", total: 3000, share: 0.3 },
+      { utility: "water", total: 1000, share: 0.1 },
+    ]);
   });
 });
 

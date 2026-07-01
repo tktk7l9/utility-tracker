@@ -50,7 +50,14 @@ export function SummaryCards({ summary }: { summary: Summary }) {
               <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
               {UTILITIES[u].label}
             </p>
-            <p className="mt-1 text-xl font-semibold">{formatYen(latest[u])}</p>
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
+              {latest.total > 0 && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {((latest[u] / latest.total) * 100).toFixed(0)}%
+                </span>
+              )}
+            </p>
             {latest.usage[u] > 0 && (
               <p className="text-xs text-muted-foreground">
                 {latest.usage[u].toLocaleString("ja-JP", { maximumFractionDigits: 1 })} {UTILITIES[u].unit}

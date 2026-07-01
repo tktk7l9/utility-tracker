@@ -23,6 +23,7 @@ import {
   type Metric,
 } from "@/lib/aggregate";
 import { cn, formatYen } from "@/lib/utils";
+import { ChartTooltip } from "./ChartTooltip";
 
 const YEAR_COLORS = ["#94a3b8", "#60a5fa", "#3a7bd5", "#1e40af"];
 
@@ -50,8 +51,10 @@ export function YoYChart({ data }: { data: MonthlyBucket[] }) {
             type="button"
             onClick={() => setMetricKey(o.key)}
             className={cn(
-              "rounded-md border px-3 py-1 text-sm transition-colors",
-              o.key === metricKey ? "border-transparent bg-primary text-primary-foreground" : "bg-background hover:bg-accent"
+              "rounded-md border px-3 py-1 text-sm font-medium transition-colors",
+              o.key === metricKey
+                ? "border-transparent bg-primary text-primary-foreground shadow-sm"
+                : "bg-background hover:bg-accent"
             )}
           >
             {o.label}
@@ -63,16 +66,25 @@ export function YoYChart({ data }: { data: MonthlyBucket[] }) {
         <p className="py-16 text-center text-sm text-muted-foreground">データがありません。</p>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <ComposedChart data={merged} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} tick={{ fontSize: 12 }} width={44} />
-            <Tooltip formatter={(value, name) => [formatYen(Number(value)), name]} />
-            <Legend />
+          <ComposedChart data={merged} margin={{ top: 16, right: 12, bottom: 4, left: 4 }}>
+            <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+            <YAxis
+              tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+              tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+              axisLine={false}
+              tickLine={false}
+              width={40}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+              content={<ChartTooltip valueFormatter={(v) => formatYen(v)} />}
+            />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
             {years.map((y, i) => (
-              <Bar key={y} dataKey={y} name={`${y}年`} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} />
+              <Bar key={y} dataKey={y} name={`${y}年`} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} maxBarSize={26} isAnimationActive={false} />
             ))}
-            <Line type="monotone" dataKey="avg" name="季節平均" stroke="var(--warning)" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="avg" name="季節平均" stroke="var(--warning)" strokeWidth={2} dot={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       )}
