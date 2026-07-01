@@ -95,11 +95,19 @@ export function Dashboard() {
 
   return (
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="overview">料金・総評</TabsTrigger>
-        <TabsTrigger value="usage">使用量・単価</TabsTrigger>
-        <TabsTrigger value="yoy">前年同月比</TabsTrigger>
-        <TabsTrigger value="entry">入力・管理</TabsTrigger>
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-flex sm:h-10 sm:w-auto sm:gap-0">
+        <TabsTrigger value="overview" className="w-full sm:w-auto">
+          料金・総評
+        </TabsTrigger>
+        <TabsTrigger value="usage" className="w-full sm:w-auto">
+          使用量・単価
+        </TabsTrigger>
+        <TabsTrigger value="yoy" className="w-full sm:w-auto">
+          前年同月比
+        </TabsTrigger>
+        <TabsTrigger value="entry" className="w-full sm:w-auto">
+          入力・管理
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
@@ -180,7 +188,7 @@ export function Dashboard() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex-col items-stretch gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">登録済みレコード（{readings.length} 件）</CardTitle>
             <div className="flex gap-2">
               <Button
