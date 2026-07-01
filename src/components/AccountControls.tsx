@@ -28,9 +28,9 @@ export function AccountControls() {
   return (
     <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
       <span className="hidden max-w-[12rem] truncate sm:inline">{session.user.email}</span>
-      <Button variant="ghost" size="sm" onClick={() => signOut()}>
+      <Button variant="ghost" size="sm" onClick={() => signOut()} aria-label="ログアウト">
         <LogOut className="size-4" />
-        ログアウト
+        <span className="hidden sm:inline">ログアウト</span>
       </Button>
     </div>
   );
