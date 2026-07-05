@@ -5,7 +5,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UTILITIES, UTILITY_ORDER, type NewReading, type Utility } from "@/lib/domain";
+import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Utility } from "@/lib/domain";
+import { inferBuilding } from "@/lib/buildings";
+
+const selectClass =
+  "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function firstOfMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -15,11 +19,20 @@ function lastOfMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
 }
 
-export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }) {
+export function EntryForm({
+  buildings,
+  defaultBuildingId,
+  onAdd,
+}: {
+  buildings: Building[];
+  defaultBuildingId: string | null;
+  onAdd: (r: NewReading) => Promise<void>;
+}) {
   const now = new Date();
   const [utility, setUtility] = useState<Utility>("electricity");
   const [periodStart, setPeriodStart] = useState(firstOfMonth(now));
   const [periodEnd, setPeriodEnd] = useState(lastOfMonth(now));
+  const [buildingChoice, setBuildingChoice] = useState(defaultBuildingId ?? "");
   const [amount, setAmount] = useState("");
   const [usage, setUsage] = useState("");
   const [note, setNote] = useState("");
@@ -28,6 +41,7 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
   const [ok, setOk] = useState(false);
 
   const meta = UTILITIES[utility];
+  const inferred = inferBuilding(buildings, periodStart, periodEnd);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,11 +61,17 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
       setError("使用量は0以上の数値で入力してください。");
       return;
     }
+    const buildingId = buildingChoice || inferred?.id;
+    if (!buildingId) {
+      setError("建物を選択してください。");
+      return;
+    }
 
     setBusy(true);
     try {
       await onAdd({
         utility,
+        buildingId,
         provider: meta.provider,
         periodStart,
         periodEnd,
@@ -94,6 +114,23 @@ export function EntryForm({ onAdd }: { onAdd: (r: NewReading) => Promise<void> }
           ))}
         </div>
         <p className="text-xs text-muted-foreground">事業者: {meta.provider}（種別で自動設定）</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="building">建物</Label>
+        <select
+          id="building"
+          className={selectClass}
+          value={buildingChoice}
+          onChange={(e) => setBuildingChoice(e.target.value)}
+        >
+          <option value="">自動（推定: {inferred?.name ?? "該当なし"}）</option>
+          {buildings.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

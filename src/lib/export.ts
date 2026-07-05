@@ -1,15 +1,16 @@
 // 手入力・取込で積み上げた履歴のバックアップ／可搬用エクスポート（純関数）。
 // データは Supabase にしか無いため、JSON/CSV で書き出せると保全性・可搬性が上がる。
 
-import type { Reading } from "./domain";
+import type { Building, Reading } from "./domain";
 
-/** レコードを整形 JSON 文字列に。 */
-export function toExportJson(readings: Reading[]): string {
-  return JSON.stringify(readings, null, 2);
+/** レコードを建物マスタごと整形 JSON 文字列に（居住期間まで含めて自己完結するバックアップ）。 */
+export function toExportJson(readings: Reading[], buildings: Building[]): string {
+  return JSON.stringify({ buildings, readings }, null, 2);
 }
 
 const CSV_HEADER = [
   "utility",
+  "building",
   "provider",
   "period_start",
   "period_end",
@@ -27,13 +28,15 @@ function csvCell(value: string | number | null | undefined): string {
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** レコードを CSV 文字列（CRLF 改行・ヘッダ付き）に。 */
-export function toCsv(readings: Reading[]): string {
+/** レコードを CSV 文字列（CRLF 改行・ヘッダ付き）に。建物は名前で出力し、未解決なら id にフォールバック。 */
+export function toCsv(readings: Reading[], buildings: Building[]): string {
+  const nameById = new Map(buildings.map((b) => [b.id, b.name]));
   const lines = [CSV_HEADER.join(",")];
   for (const r of readings) {
     lines.push(
       [
         r.utility,
+        nameById.get(r.buildingId) ?? r.buildingId,
         r.provider,
         r.periodStart,
         r.periodEnd,

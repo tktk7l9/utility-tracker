@@ -25,6 +25,7 @@ function reading(p: Partial<Reading>): Reading {
   return {
     id: p.id ?? Math.random().toString(36).slice(2),
     utility: p.utility ?? "electricity",
+    buildingId: p.buildingId ?? "b1",
     provider: p.provider ?? "TEPCO",
     periodStart: p.periodStart ?? "2026-06-01",
     periodEnd: p.periodEnd ?? "2026-06-30",
@@ -212,6 +213,18 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
     expect(full[0].complete).toBe(true);
     expect(trimIncompleteEnds(full)).toHaveLength(1);
     expect(trimIncompleteEnds([])).toEqual([]);
+  });
+
+  it("「すべて（合算）」ビュー: 建物をまたいでも金額・使用量は単純加算され、引っ越し月の重複期間は complete を壊さない", () => {
+    // 6/1〜6/14 旧居、6/15〜6/30 新居（引っ越し当日で連続・重複なし）に分かれた検針。
+    const series = toMonthlySeries([
+      reading({ buildingId: "old", periodStart: "2026-06-01", periodEnd: "2026-06-14", amountYen: 1000, usageValue: 40 }),
+      reading({ buildingId: "new", periodStart: "2026-06-15", periodEnd: "2026-06-30", amountYen: 1200, usageValue: 60 }),
+    ]);
+    const jun = series.find((b) => b.month === "2026-06")!;
+    expect(jun.electricity).toBe(2200); // 1000 + 1200
+    expect(jun.usage.electricity).toBe(100); // 40 + 60
+    expect(jun.complete).toBe(true); // mergeIntervals が連続区間として結合し月全体をカバー
   });
 });
 

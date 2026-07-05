@@ -5,11 +5,29 @@ export type Utility = "electricity" | "gas" | "water";
 
 export type ReadingSource = "manual" | "csv";
 
+/**
+ * 住まい（建物）。1行 = 1つの居住期間で、引っ越し記録を兼ねる
+ * （同じ建物への出戻りは別レコード）。DB `buildings` テーブルの1行に対応。
+ */
+export interface Building {
+  id: string;
+  name: string;
+  /** 入居日 (YYYY-MM-DD)。 */
+  movedInOn: string;
+  /** 退去日 (YYYY-MM-DD)。null = 現住。 */
+  movedOutOn: string | null;
+}
+
+/** id を持たない新規建物（追加フォームの投入形）。 */
+export type NewBuilding = Omit<Building, "id">;
+
 /** 1社・1検針期間の請求レコード（DB `readings` テーブルの1行に対応）。 */
 export interface Reading {
   id: string;
   utility: Utility;
   provider: string;
+  /** 建物（`buildings.id`）。 */
+  buildingId: string;
   /** 検針期間の開始日 (YYYY-MM-DD)。 */
   periodStart: string;
   /** 検針期間の終了日 (YYYY-MM-DD)。 */

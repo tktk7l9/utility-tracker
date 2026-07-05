@@ -119,6 +119,11 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
           </ComposedChart>
         </ResponsiveContainer>
       )}
+      {data.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          ※「すべて（合算）」表示では、引っ越し月に同じ月のレコードが複数（旧居・新居）並ぶことがあります。
+        </p>
+      )}
     </div>
   );
 }

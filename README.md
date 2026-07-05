@@ -24,7 +24,7 @@ recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Vercel（`X-Rob
 
 2. Supabase プロジェクトを作成し、Dashboard → SQL Editor で以下を順に実行
 
-   1. `supabase/schema.sql` — `readings` テーブル作成
+   1. `supabase/schema.sql` — `buildings` / `readings` テーブル作成
    2. Authentication → Providers で **Email を有効化**し、「Allow new users to sign up」を **OFF**
    3. Authentication → Users → Add user で自分のアカウントを作成
    4. `supabase/rls.sql` — RLS を有効化（**実行するまで匿名で誰でも読み書き可能**。必須）
@@ -52,11 +52,15 @@ recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Vercel（`X-Rob
 | `npm run test` | Vitest |
 | `npm run test:coverage` | カバレッジ（`src/lib/**` は 100% ゲート） |
 
-## データモデル（`readings`）
+## データモデル（`buildings` / `readings`）
 
-1行 = 1社・1検針期間の請求。水道は隔月請求のため `period_start`〜`period_end` を保持し、
-月次グラフではカレンダー月へ**日割り按分**して合算する。`unique(utility, period_start, period_end)`
-により CSV の再取込・重複入力は冪等（`bulkUpsert` が上書きマージ）。
+`buildings` は住まい（建物）のマスタで、1行 = 1つの居住期間（入居日〜退去日。退去日 null = 現住）。
+同じ建物への出戻りは別行として登録する。画面上部の建物セレクタで「すべて（合算）/ 各建物」を切替できる。
+
+`readings` は 1行 = 1社・1検針期間の請求で、`building_id` で建物に紐づく。水道は隔月請求のため
+`period_start`〜`period_end` を保持し、月次グラフではカレンダー月へ**日割り按分**して合算する。
+`unique(user_id, building_id, utility, period_start, period_end)` により CSV の再取込・重複入力は
+冪等（`bulkUpsert` が上書きマージ）。レコードが残る建物は削除できない（FK restrict）。
 
 | 列 | 説明 |
 | --- | --- |
@@ -66,6 +70,9 @@ recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Vercel（`X-Rob
 | `amount_yen` | 税込請求額（円） |
 | `usage_value` / `usage_unit` | 使用量（kWh / m³）・単位 |
 | `source` | `manual` / `csv` |
+| `building_id` | 建物（`buildings.id`）。手入力・CSV 取込では検針期間から自動推定も可 |
+
+JSON エクスポートは `{ buildings, readings }` 形状（居住期間まで含めてバックアップが自己完結する）。
 
 ## CSV 取込
 

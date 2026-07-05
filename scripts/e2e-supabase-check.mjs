@@ -61,8 +61,16 @@ if (!signIn?.session) {
   process.exit(1);
 }
 
+const { data: building, error: buildingErr } = await supabase
+  .from("buildings")
+  .select("id")
+  .limit(1)
+  .single();
+step("建物を1件取得（readings.building_id の付与に使う）", !buildingErr && !!building?.id, buildingErr?.message);
+
 const probe = {
   utility: "electricity",
+  building_id: building?.id,
   provider: "TEPCO",
   period_start: "2099-01-01",
   period_end: "2099-01-31",
@@ -80,11 +88,11 @@ if (ins?.id) {
   const { data: sel, error: selErr } = await supabase.from("readings").select("id,note").eq("id", ins.id).single();
   step("SELECT で読み戻し", !selErr && sel?.id === ins.id, selErr?.message);
 
-  // 同一キーで upsert → 新 unique(user_id,utility,period_start,period_end) に一致し、
+  // 同一キーで upsert → 新 unique(user_id,building_id,utility,period_start,period_end) に一致し、
   // 重複 INSERT でなく UPDATE になることを確認する（bulkUpsert の onConflict と制約の整合）。
   const { error: upErr } = await supabase
     .from("readings")
-    .upsert({ ...probe, amount_yen: 2 }, { onConflict: "user_id,utility,period_start,period_end" });
+    .upsert({ ...probe, amount_yen: 2 }, { onConflict: "user_id,building_id,utility,period_start,period_end" });
   step("同一キー upsert（onConflict が新 unique 制約に一致）", !upErr, upErr?.message);
 
   const { data: dup } = await supabase

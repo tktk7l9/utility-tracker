@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { UTILITIES, UTILITY_ORDER, type NewReading, type Utility } from "@/lib/domain";
+import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Utility } from "@/lib/domain";
 import { parseCsv, mapRowsToReadings, dedupe, readingKey, type CsvMapping } from "@/lib/csv";
 import { formatYen } from "@/lib/utils";
 
@@ -44,9 +44,13 @@ function ColSelect({
 }
 
 export function CsvImport({
+  buildings,
+  defaultBuildingId,
   existingKeys,
   onImport,
 }: {
+  buildings: Building[];
+  defaultBuildingId: string | null;
   existingKeys: string[];
   onImport: (readings: NewReading[]) => Promise<void>;
 }) {
@@ -54,6 +58,7 @@ export function CsvImport({
   const [encoding, setEncoding] = useState("utf-8");
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
   const [utility, setUtility] = useState<Utility>("electricity");
+  const [buildingChoice, setBuildingChoice] = useState(defaultBuildingId ?? "");
   const [hasHeader, setHasHeader] = useState(true);
   const [overwrite, setOverwrite] = useState(false);
   const [colEnd, setColEnd] = useState(0);
@@ -111,6 +116,8 @@ export function CsvImport({
 
   const mapping: CsvMapping = {
     utility,
+    buildingId: buildingChoice || undefined,
+    buildings,
     hasHeader,
     columns: {
       periodEnd: colEnd,
@@ -123,13 +130,14 @@ export function CsvImport({
   const parsed = useMemo(
     () => (rows.length ? mapRowsToReadings(rows, mapping) : { readings: [], errors: [] }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, utility, hasHeader, colEnd, colAmount, colStart, colUsage]
+    [rows, utility, buildingChoice, buildings, hasHeader, colEnd, colAmount, colStart, colUsage]
   );
   // 上書きモードでは既存キーを除外せず、ファイル内重複だけ畳む（bulkUpsert が upsert で上書き）。
   const { toInsert, duplicates } = dedupe(parsed.readings, overwrite ? [] : existingKeys);
   const overwriteCount = overwrite ? toInsert.filter((r) => existingSet.has(readingKey(r))).length : 0;
 
   const headerLabel = (i: number): string => (hasHeader && rows[0]?.[i] ? rows[0][i] : `列${i + 1}`);
+  const buildingNameById = useMemo(() => new Map(buildings.map((b) => [b.id, b.name])), [buildings]);
 
   async function runImport() {
     setBusy(true);
@@ -167,6 +175,22 @@ export function CsvImport({
               </button>
             ))}
           </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="building">建物</Label>
+          <select
+            id="building"
+            className={selectClass}
+            value={buildingChoice}
+            onChange={(e) => setBuildingChoice(e.target.value)}
+          >
+            <option value="">自動（期間から判定）</option>
+            {buildings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="enc">文字コード</Label>
@@ -222,6 +246,7 @@ export function CsvImport({
               <table className="w-full text-sm">
                 <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-2">建物</th>
                     <th className="px-3 py-2">期間</th>
                     <th className="px-3 py-2">金額</th>
                     <th className="px-3 py-2">使用量</th>
@@ -230,6 +255,7 @@ export function CsvImport({
                 <tbody>
                   {toInsert.slice(0, 6).map((r, i) => (
                     <tr key={i} className="border-t">
+                      <td className="px-3 py-1.5">{buildingNameById.get(r.buildingId) ?? r.buildingId}</td>
                       <td className="px-3 py-1.5">
                         {r.periodStart} 〜 {r.periodEnd}
                       </td>

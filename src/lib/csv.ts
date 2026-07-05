@@ -2,7 +2,8 @@
 // TEPCO 想定だが、列マッピングで任意のCSVに対応できる汎用設計。
 // 各社フォーマットが未知でも UI の列マッピングで吸収する。
 
-import { UTILITIES, type NewReading, type Utility } from "./domain";
+import { UTILITIES, type Building, type NewReading, type Utility } from "./domain";
+import { inferBuilding } from "./buildings";
 
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
@@ -123,6 +124,10 @@ export function monthRange(iso: string): { start: string; end: string } {
 export interface CsvMapping {
   /** このCSV全体が対象とする光熱費。 */
   utility: Utility;
+  /** 取込先の建物。省略時は `buildings` から検針期間で行ごとに自動推定。 */
+  buildingId?: string;
+  /** `buildingId` 省略時の推定候補（居住期間で照合）。 */
+  buildings?: Building[];
   /** 事業者名（省略時は光熱費の既定値）。 */
   provider?: string;
   /** 使用量の単位（省略時は光熱費の既定値）。 */
@@ -205,10 +210,20 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
       return;
     }
 
+    // 建物: 固定指定がなければ検針期間と居住期間の重なりから行ごとに推定
+    // （引っ越しをまたぐ CSV も1回の取込で振り分けられる）。
+    const buildingId =
+      mapping.buildingId ?? inferBuilding(mapping.buildings ?? [], periodStart, periodEnd)?.id;
+    if (buildingId == null) {
+      errors.push({ row: rowIndex, reason: "検針期間に該当する建物がありません" });
+      return;
+    }
+
     const usageValue = usageCol != null ? normalizeNumber(cells[usageCol]) : null;
 
     readings.push({
       utility: mapping.utility,
+      buildingId,
       provider,
       periodStart,
       periodEnd,
@@ -223,9 +238,14 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
   return { readings, errors };
 }
 
-/** 一意キー（同一光熱費・同一期間を重複とみなす）。 */
-export function readingKey(r: { utility: Utility; periodStart: string; periodEnd: string }): string {
-  return `${r.utility}|${r.periodStart}|${r.periodEnd}`;
+/** 一意キー（同一建物・同一光熱費・同一期間を重複とみなす。DB の一意制約と同じ粒度）。 */
+export function readingKey(r: {
+  buildingId: string;
+  utility: Utility;
+  periodStart: string;
+  periodEnd: string;
+}): string {
+  return `${r.buildingId}|${r.utility}|${r.periodStart}|${r.periodEnd}`;
 }
 
 export interface DedupeResult {

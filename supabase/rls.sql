@@ -1,4 +1,4 @@
--- utility-tracker: readings テーブルを認証済みユーザーのみに制限する。
+-- utility-tracker: buildings / readings テーブルを認証済みユーザーのみに制限する。
 --
 -- ⚠️ 重要: これを実行するまで anon キーで誰でも読み書き可能。必ず実行すること。
 --    （plant-ledger では rls.sql の実行を忘れて匿名アクセスが空いていた教訓）
@@ -28,6 +28,17 @@ drop policy if exists "authenticated full access" on public.readings;
 drop policy if exists "own rows" on public.readings;
 create policy "own rows"
   on public.readings
+  for all
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- buildings も同じ own rows 方針（建物は同一ユーザーの子リソース）。
+alter table public.buildings enable row level security;
+
+drop policy if exists "own rows" on public.buildings;
+create policy "own rows"
+  on public.buildings
   for all
   to authenticated
   using (user_id = auth.uid())

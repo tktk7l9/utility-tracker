@@ -10,7 +10,7 @@ import {
   dedupe,
   type CsvMapping,
 } from "./csv";
-import type { NewReading } from "./domain";
+import type { Building, NewReading } from "./domain";
 
 describe("parseCsv", () => {
   it("基本のカンマ区切り＋LF", () => {
@@ -113,6 +113,7 @@ describe("mapRowsToReadings", () => {
     ];
     const mapping: CsvMapping = {
       utility: "electricity",
+      buildingId: "b1",
       hasHeader: true,
       columns: { periodEnd: 0, usage: 1, amount: 2 },
     };
@@ -121,6 +122,7 @@ describe("mapRowsToReadings", () => {
     expect(readings).toHaveLength(2);
     expect(readings[0]).toMatchObject({
       utility: "electricity",
+      buildingId: "b1",
       provider: "TEPCO",
       periodStart: "2026-05-01",
       periodEnd: "2026-05-31",
@@ -139,6 +141,7 @@ describe("mapRowsToReadings", () => {
     ];
     const { readings, errors } = mapRowsToReadings(rows, {
       utility: "gas",
+      buildingId: "b1",
       hasHeader: true,
       columns: { periodEnd: 0, usage: 1, amount: 2 },
     });
@@ -159,6 +162,7 @@ describe("mapRowsToReadings", () => {
     const rows = [["2026/05/20", "2026/06/19", "6200", "24"]];
     const mapping: CsvMapping = {
       utility: "water",
+      buildingId: "b1",
       provider: "東京都水道局",
       usageUnit: "㎥",
       hasHeader: false,
@@ -179,6 +183,7 @@ describe("mapRowsToReadings", () => {
     const rows = [["invalid", "2026/07/31", "5000"]];
     const mapping: CsvMapping = {
       utility: "gas",
+      buildingId: "b1",
       hasHeader: false,
       columns: { periodStart: 0, periodEnd: 1, amount: 2 },
     };
@@ -192,6 +197,7 @@ describe("mapRowsToReadings", () => {
     ];
     const mapping: CsvMapping = {
       utility: "electricity",
+      buildingId: "b1",
       hasHeader: false,
       columns: { periodEnd: 0, usage: 1, amount: 2 },
     };
@@ -202,6 +208,7 @@ describe("mapRowsToReadings", () => {
     // usage 列自体を指定しない場合も null
     const noUsage = mapRowsToReadings([["2026/06", "3000"]], {
       utility: "electricity",
+      buildingId: "b1",
       hasHeader: false,
       columns: { periodEnd: 0, amount: 1 },
     });
@@ -218,6 +225,7 @@ describe("mapRowsToReadings", () => {
     ];
     const mapping: CsvMapping = {
       utility: "electricity",
+      buildingId: "b1",
       hasHeader: true,
       columns: { periodEnd: 0, amount: 1 },
     };
@@ -233,17 +241,61 @@ describe("mapRowsToReadings", () => {
     const rows = [["2026/07/31", "2026/07/01", "5000"]];
     const { readings, errors } = mapRowsToReadings(rows, {
       utility: "gas",
+      buildingId: "b1",
       hasHeader: false,
       columns: { periodStart: 0, periodEnd: 1, amount: 2 },
     });
     expect(readings).toHaveLength(0);
     expect(errors).toEqual([{ row: 0, reason: "検針期間の終了日が開始日より前です" }]);
   });
+
+  describe("建物の解決", () => {
+    const oldHome: Building = { id: "old", name: "旧居", movedInOn: "2025-01-01", movedOutOn: "2026-05-31" };
+    const newHome: Building = { id: "new", name: "新居", movedInOn: "2026-06-01", movedOutOn: null };
+
+    it("buildingId 省略時は行ごとに居住期間から推定（引っ越しまたぎ CSV を振り分け）", () => {
+      const rows = [
+        ["2026/05", "3000"],
+        ["2026/06", "3200"],
+      ];
+      const { readings, errors } = mapRowsToReadings(rows, {
+        utility: "electricity",
+        buildings: [oldHome, newHome],
+        hasHeader: false,
+        columns: { periodEnd: 0, amount: 1 },
+      });
+      expect(errors).toEqual([]);
+      expect(readings.map((r) => r.buildingId)).toEqual(["old", "new"]);
+    });
+
+    it("どの居住期間にも該当しない行はエラーに回す", () => {
+      const rows = [["2024/01", "3000"]];
+      const { readings, errors } = mapRowsToReadings(rows, {
+        utility: "electricity",
+        buildings: [oldHome, newHome],
+        hasHeader: false,
+        columns: { periodEnd: 0, amount: 1 },
+      });
+      expect(readings).toHaveLength(0);
+      expect(errors).toEqual([{ row: 0, reason: "検針期間に該当する建物がありません" }]);
+    });
+
+    it("buildingId も buildings も未指定なら全行エラー", () => {
+      const { readings, errors } = mapRowsToReadings([["2026/06", "3000"]], {
+        utility: "electricity",
+        hasHeader: false,
+        columns: { periodEnd: 0, amount: 1 },
+      });
+      expect(readings).toHaveLength(0);
+      expect(errors).toEqual([{ row: 0, reason: "検針期間に該当する建物がありません" }]);
+    });
+  });
 });
 
 describe("readingKey / dedupe", () => {
-  const mk = (u: NewReading["utility"], s: string, e: string): NewReading => ({
+  const mk = (u: NewReading["utility"], s: string, e: string, buildingId = "b1"): NewReading => ({
     utility: u,
+    buildingId,
     provider: "x",
     periodStart: s,
     periodEnd: e,
@@ -254,22 +306,30 @@ describe("readingKey / dedupe", () => {
     source: "csv",
   });
 
-  it("readingKey は光熱費＋期間で一意", () => {
-    expect(readingKey(mk("gas", "2026-06-01", "2026-06-30"))).toBe("gas|2026-06-01|2026-06-30");
+  it("readingKey は建物＋光熱費＋期間で一意", () => {
+    expect(readingKey(mk("gas", "2026-06-01", "2026-06-30"))).toBe("b1|gas|2026-06-01|2026-06-30");
   });
 
-  it("既存キー・ファイル内重複を duplicates に振り分ける", () => {
+  it("同一光熱費・同一期間でも建物が違えば別キー", () => {
+    expect(readingKey(mk("gas", "2026-06-01", "2026-06-30", "b1"))).not.toBe(
+      readingKey(mk("gas", "2026-06-01", "2026-06-30", "b2"))
+    );
+  });
+
+  it("既存キー・ファイル内重複を duplicates に振り分ける（別建物は重複にしない）", () => {
     const incoming = [
       mk("electricity", "2026-06-01", "2026-06-30"),
       mk("electricity", "2026-06-01", "2026-06-30"), // ファイル内重複
       mk("water", "2026-05-01", "2026-06-30"), // 既存にあり
       mk("gas", "2026-06-01", "2026-06-30"), // 新規
+      mk("water", "2026-05-01", "2026-06-30", "b2"), // 既存と同期間だが別建物 → 新規
     ];
-    const existing = ["water|2026-05-01|2026-06-30"];
+    const existing = ["b1|water|2026-05-01|2026-06-30"];
     const { toInsert, duplicates } = dedupe(incoming, existing);
     expect(toInsert.map(readingKey)).toEqual([
-      "electricity|2026-06-01|2026-06-30",
-      "gas|2026-06-01|2026-06-30",
+      "b1|electricity|2026-06-01|2026-06-30",
+      "b1|gas|2026-06-01|2026-06-30",
+      "b2|water|2026-05-01|2026-06-30",
     ]);
     expect(duplicates).toHaveLength(2);
   });
