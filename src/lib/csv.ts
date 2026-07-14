@@ -90,28 +90,117 @@ export function normalizeNumber(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** "5月14日 ～ 7月10日"（東京都水道局）のような1セル内期間の区切り。 */
+const RANGE_SEP = /[～〜~]/;
+
+interface DateParts {
+  y: number | null;
+  m: number;
+  d: number | null;
+}
+
 /**
- * "2026/6/1" "2026-06-01" "2026年6月1日" "2026年6月"（日省略=1日）を
- * "YYYY-MM-DD" へ正規化。解釈不能なら null。
+ * 1つの日付表記を年・月・日に分解する。年・日は省略可
+ * （"5月14日"・"8年 7月分"・"6月" 等の部分表記を許す）。解釈不能なら null。
  */
-export function normalizeDate(raw: string | null | undefined): string | null {
-  if (raw == null) return null;
-  let s = toHalfWidth(String(raw)).trim();
+function parseDateParts(raw: string): DateParts | null {
+  let s = toHalfWidth(raw).trim();
   if (s === "") return null;
-  s = s.replace(/[年月]/g, "/").replace(/日/g, "").replace(/\/+$/, "");
+  const hasYear = s.includes("年");
+  const hasMonth = s.includes("月");
+  s = s
+    .replace(/分\s*$/, "")
+    .replace(/[年月]/g, "/")
+    .replace(/日/g, "")
+    .replace(/\/+\s*$/, "");
   const parts = s
     .split(/[/\-.]/)
     .map((p) => p.trim())
     .filter((p) => p !== "");
-  if (parts.length < 2) return null;
-  let y = Number(parts[0]);
-  const m = Number(parts[1]);
-  const d = parts.length >= 3 ? Number(parts[2]) : 1;
-  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
-  // 2桁年（LPIO「26年06月」等）は 20xx として解釈する。
-  if (y < 100) y += 2000;
+  if (parts.length === 0 || parts.some((p) => !/^\d+$/.test(p))) return null;
+  const nums = parts.map(Number);
+  if (nums.length >= 3) return { y: nums[0], m: nums[1], d: nums[2] };
+  if (nums.length === 2) {
+    if (hasYear) return { y: nums[0], m: nums[1], d: null }; // "8年 7月" "2026年6月"
+    if (hasMonth) return { y: null, m: nums[0], d: nums[1] }; // "5月14日"
+    return { y: nums[0], m: nums[1], d: null }; // "2026/06"
+  }
+  // 1要素は "6月" のような月のみ表記だけを日付候補として許す（"2026"・"10日" は不可）。
+  if (hasMonth && !hasYear) return { y: null, m: nums[0], d: null };
+  return null;
+}
+
+/**
+ * 2桁年を西暦2000年代（LPIO「26年06月」= 2026）と令和（東京都水道局「8年 6月」= 令和8年
+ * = 2026）の両解釈で比較し、today の年に近い方を採る（同距離なら西暦。令和0年は存在しない）。
+ */
+function resolveTwoDigitYear(y: number, todayYear: number): number {
+  const west = 2000 + y;
+  if (y < 1) return west;
+  const reiwa = 2018 + y;
+  return Math.abs(reiwa - todayYear) < Math.abs(west - todayYear) ? reiwa : west;
+}
+
+/** 年月日をレンジ検証つきで "YYYY-MM-DD" にする。範囲外は null。 */
+function toIso(y: number, m: number, d: number): string | null {
   if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1 || d > 31) return null;
   return `${y}-${pad2(m)}-${pad2(d)}`;
+}
+
+/**
+ * "2026/6/1" "2026-06-01" "2026年6月1日" "2026年6月"（日省略=1日）"8年 7月分"（和暦）を
+ * "YYYY-MM-DD" へ正規化。"6月 ～ 7月分" のような範囲表記は終端側を採る。解釈不能なら null。
+ */
+export function normalizeDate(raw: string | null | undefined, today: Date = new Date()): string | null {
+  if (raw == null) return null;
+  const sides = String(raw).split(RANGE_SEP);
+  const p = parseDateParts(sides[sides.length - 1]);
+  if (p == null || p.y == null) return null;
+  const y = p.y < 100 ? resolveTwoDigitYear(p.y, today.getFullYear()) : p.y;
+  return toIso(y, p.m, p.d ?? 1);
+}
+
+/**
+ * "5月14日 ～ 7月10日" のような1セル内の期間表記を {start, end} に分解する。
+ * 年が無い側は anchorEnd（期間終了列から得た "YYYY-MM-DD"）の年で補完し、
+ * 月が半年超ずれる場合や開始>終了になる場合は年またぎ（12月→1月等）として補正する。
+ */
+export function normalizeDateRange(
+  raw: string | null | undefined,
+  anchorEnd: string,
+  today: Date = new Date()
+): { start: string; end: string } | null {
+  if (raw == null) return null;
+  const sides = String(raw).split(RANGE_SEP);
+  if (sides.length !== 2) return null;
+  const sp = parseDateParts(sides[0]);
+  const ep = parseDateParts(sides[1]);
+  if (sp == null || ep == null) return null;
+
+  const [anchorY, anchorM] = anchorEnd.split("-").map(Number);
+
+  let ey: number;
+  if (ep.y != null) {
+    ey = ep.y < 100 ? resolveTwoDigitYear(ep.y, today.getFullYear()) : ep.y;
+  } else {
+    ey = anchorY;
+    if (ep.m - anchorM > 6) ey -= 1;
+    else if (anchorM - ep.m > 6) ey += 1;
+  }
+  const end = toIso(ey, ep.m, ep.d ?? 1);
+  if (end == null) return null;
+
+  let sy: number;
+  if (sp.y != null) {
+    sy = sp.y < 100 ? resolveTwoDigitYear(sp.y, today.getFullYear()) : sp.y;
+  } else {
+    sy = ey;
+    if (sp.m > ep.m || (sp.m === ep.m && (sp.d ?? 1) > (ep.d ?? 1))) sy -= 1;
+  }
+  const start = toIso(sy, sp.m, sp.d ?? 1);
+  if (start == null) return null;
+
+  return { start, end };
 }
 
 /** "YYYY-MM-DD" の属する月の初日・末日を返す。 */
@@ -164,7 +253,7 @@ function isBlankRow(cells: string[]): boolean {
 }
 
 /** パース済みの行群を、マッピングに従って NewReading[] に変換する。 */
-export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapResult {
+export function mapRowsToReadings(rows: string[][], mapping: CsvMapping, today: Date = new Date()): MapResult {
   const meta = UTILITIES[mapping.utility];
   const provider = mapping.provider ?? meta.provider;
   const usageUnit = mapping.usageUnit ?? meta.unit;
@@ -181,7 +270,7 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
     if (isBlankRow(cells)) return;
 
     const amount = normalizeNumber(cells[amountCol]);
-    const endDate = normalizeDate(cells[endCol]);
+    const endDate = normalizeDate(cells[endCol], today);
 
     if (amount == null) {
       errors.push({ row: rowIndex, reason: "金額を数値として解釈できません" });
@@ -194,14 +283,23 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
 
     let periodStart: string;
     let periodEnd: string;
-    const rawStart = startCol != null ? normalizeDate(cells[startCol]) : null;
-    if (rawStart != null) {
-      periodStart = rawStart;
-      periodEnd = endDate;
+    const startCell = startCol != null ? cells[startCol] : undefined;
+    // 東京都水道局の「使用期間」のような1セル内期間（"5月14日 ～ 7月10日"）は、
+    // 終了列の日付（使用月分等）を年の基準にして開始・終了の両方をここから取る。
+    const cellRange = startCell != null && RANGE_SEP.test(startCell) ? normalizeDateRange(startCell, endDate, today) : null;
+    if (cellRange != null) {
+      periodStart = cellRange.start;
+      periodEnd = cellRange.end;
     } else {
-      const range = monthRange(endDate);
-      periodStart = range.start;
-      periodEnd = range.end;
+      const rawStart = startCell != null && !RANGE_SEP.test(startCell) ? normalizeDate(startCell, today) : null;
+      if (rawStart != null) {
+        periodStart = rawStart;
+        periodEnd = endDate;
+      } else {
+        const range = monthRange(endDate);
+        periodStart = range.start;
+        periodEnd = range.end;
+      }
     }
 
     // 期間逆転（終了<開始）は集計に寄与しない“死んだ行”になるためエラーに回す。
@@ -236,6 +334,42 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping): MapRes
   });
 
   return { readings, errors };
+}
+
+export interface ColumnGuess {
+  periodEnd: number | null;
+  periodStart: number | null;
+  amount: number | null;
+  usage: number | null;
+}
+
+/**
+ * ヘッダ行の列名から列マッピングの初期値を推定する（TEPCO・LPIO・東京都水道局の実CSVを想定）。
+ * 同名を含む列が複数あるときは先頭優先。該当なしの項目は null（UI 側で既定値に落とす）。
+ */
+export function guessColumns(header: string[]): ColumnGuess {
+  const find = (...patterns: RegExp[]): number | null => {
+    for (const p of patterns) {
+      const i = header.findIndex((h) => p.test(h));
+      if (i !== -1) return i;
+    }
+    return null;
+  };
+  return {
+    periodEnd: find(/使用月分/, /検針日/, /年月/, /日付/),
+    periodStart: find(/使用期間/),
+    amount: find(/請求金額/, /請求額/, /利用金額/, /金額/, /料金/),
+    usage: find(/使用量/),
+  };
+}
+
+/** ヘッダの語彙から光熱費種別を推定する。判別できなければ null。 */
+export function guessUtility(header: string[]): Utility | null {
+  const joined = header.join(" ");
+  if (joined.includes("水道")) return "water";
+  if (joined.includes("ガス")) return "gas";
+  if (/kWh|電気|電力/i.test(joined)) return "electricity";
+  return null;
 }
 
 /** 一意キー（同一建物・同一光熱費・同一期間を重複とみなす。DB の一意制約と同じ粒度）。 */

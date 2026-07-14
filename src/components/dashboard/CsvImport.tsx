@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Utility } from "@/lib/domain";
-import { parseCsv, mapRowsToReadings, dedupe, readingKey, type CsvMapping } from "@/lib/csv";
+import { parseCsv, mapRowsToReadings, dedupe, readingKey, guessColumns, guessUtility, type CsvMapping } from "@/lib/csv";
 import { formatYen } from "@/lib/utils";
 
 const selectClass =
@@ -75,10 +75,17 @@ export function CsvImport({
 
   function applyDefaults(parsed: string[][]) {
     const cols = parsed.reduce((m, r) => Math.max(m, r.length), 0);
-    setColEnd(0);
-    setColAmount(cols > 1 ? cols - 1 : 0);
-    setColStart(null);
-    setColUsage(null);
+    // ヘッダがあれば列名から初期マッピングと種別を推定する（外れても手動で選び直せる）。
+    const header = hasHeader ? parsed[0] : undefined;
+    const guess = header && header.length > 0 ? guessColumns(header) : null;
+    setColEnd(guess?.periodEnd ?? 0);
+    setColAmount(guess?.amount ?? (cols > 1 ? cols - 1 : 0));
+    setColStart(guess?.periodStart ?? null);
+    setColUsage(guess?.usage ?? null);
+    if (header) {
+      const u = guessUtility(header);
+      if (u) setUtility(u);
+    }
     setDone(null);
     setError(null);
   }

@@ -4,10 +4,13 @@ import {
   toHalfWidth,
   normalizeNumber,
   normalizeDate,
+  normalizeDateRange,
   monthRange,
   mapRowsToReadings,
   readingKey,
   dedupe,
+  guessColumns,
+  guessUtility,
   type CsvMapping,
 } from "./csv";
 import type { Building, NewReading } from "./domain";
@@ -76,11 +79,25 @@ describe("normalizeDate", () => {
     expect(normalizeDate("２０２６/０６/１９")).toBe("2026-06-19");
     expect(normalizeDate("2026.6.1")).toBe("2026-06-01");
   });
-  it("2桁年は 20xx として解釈（LPIO「26年06月」形式）", () => {
-    expect(normalizeDate("26年06月")).toBe("2026-06-01");
-    expect(normalizeDate("25年12月")).toBe("2025-12-01");
-    expect(normalizeDate("26/6/1")).toBe("2026-06-01");
-    expect(normalizeDate("00年01月")).toBe("2000-01-01");
+  it("2桁年は西暦20xx／令和のうち today に近い方（LPIO「26年06月」・水道局「8年 6月」）", () => {
+    const today = new Date("2026-07-14");
+    expect(normalizeDate("26年06月", today)).toBe("2026-06-01"); // 西暦2026 が令和26(2044)より近い
+    expect(normalizeDate("25年12月", today)).toBe("2025-12-01");
+    expect(normalizeDate("26/6/1", today)).toBe("2026-06-01");
+    expect(normalizeDate("8年 6月", today)).toBe("2026-06-01"); // 令和8(2026) が西暦2008より近い
+    expect(normalizeDate("00年01月", today)).toBe("2000-01-01"); // 令和0年は存在しない → 西暦
+    expect(normalizeDate("8年1月", new Date("2017-06-01"))).toBe("2008-01-01"); // 同距離なら西暦
+  });
+  it("和暦＋範囲＋「分」（東京都水道局「使用月分」）は終端側を採る", () => {
+    const today = new Date("2026-07-14");
+    expect(normalizeDate(" 8年 6月 ～  8年 7月分", today)).toBe("2026-07-01");
+    expect(normalizeDate("2026/06")).toBe("2026-06-01");
+  });
+  it("年を持たない部分表記（月日・月のみ・日のみ）は単独では null", () => {
+    expect(normalizeDate("5月14日")).toBeNull();
+    expect(normalizeDate("6月")).toBeNull();
+    expect(normalizeDate("10日")).toBeNull();
+    expect(normalizeDate("8年月")).toBeNull(); // 崩れた表記
   });
   it("解釈不能・範囲外・null は null", () => {
     expect(normalizeDate("")).toBeNull();
@@ -91,6 +108,72 @@ describe("normalizeDate", () => {
     expect(normalizeDate("2026/13/01")).toBeNull();
     expect(normalizeDate("1899/06/01")).toBeNull();
     expect(normalizeDate("2026/06/40")).toBeNull();
+  });
+});
+
+describe("normalizeDateRange", () => {
+  const today = new Date("2026-07-14");
+
+  it("年なしの両側を anchor の年で補完する（水道局「使用期間」）", () => {
+    expect(normalizeDateRange(" 5月14日 ～  7月10日", "2026-07-01", today)).toEqual({
+      start: "2026-05-14",
+      end: "2026-07-10",
+    });
+  });
+
+  it("開始>終了は年またぎ期間として開始を前年に倒す", () => {
+    expect(normalizeDateRange("11月14日 ～ 1月10日", "2026-01-31", today)).toEqual({
+      start: "2025-11-14",
+      end: "2026-01-10",
+    });
+    // 同月内で日が逆転しているケースも同じ規則
+    expect(normalizeDateRange("6月20日 ～ 6月10日", "2026-06-30", today)).toEqual({
+      start: "2025-06-20",
+      end: "2026-06-10",
+    });
+  });
+
+  it("anchor と半年超ずれる終端は年またぎとして補正する", () => {
+    expect(normalizeDateRange("11月14日 ～ 12月28日", "2026-01-31", today)).toEqual({
+      start: "2025-11-14",
+      end: "2025-12-28",
+    });
+    expect(normalizeDateRange("1月4日 ～ 1月20日", "2026-12-01", today)).toEqual({
+      start: "2027-01-04",
+      end: "2027-01-20",
+    });
+  });
+
+  it("年つきの側は自前の年を使う（和暦・西暦とも）", () => {
+    expect(normalizeDateRange("8年6月 ～ 8年7月分", "2030-01-01", today)).toEqual({
+      start: "2026-06-01",
+      end: "2026-07-01",
+    });
+    expect(normalizeDateRange("2026/5/14 ～ 2026/7/10", "2030-01-01", today)).toEqual({
+      start: "2026-05-14",
+      end: "2026-07-10",
+    });
+    expect(normalizeDateRange("26/5/14 ～ 2026/7/10", "2030-01-01", today)).toEqual({
+      start: "2026-05-14",
+      end: "2026-07-10",
+    });
+  });
+
+  it("月のみの側は1日として扱う", () => {
+    expect(normalizeDateRange("6月 ～ 7月10日", "2026-07-01", today)).toEqual({
+      start: "2026-06-01",
+      end: "2026-07-10",
+    });
+  });
+
+  it("解釈不能・区切りが2側でない・範囲外は null", () => {
+    expect(normalizeDateRange(null, "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("2026/6/1", "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("1月 ～ 2月 ～ 3月", "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("?? ～ 7月10日", "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("5月14日 ～ ??", "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("5月14日 ～ 13月10日", "2026-07-01", today)).toBeNull();
+    expect(normalizeDateRange("0月14日 ～ 7月10日", "2026-07-01", today)).toBeNull();
   });
 });
 
@@ -177,6 +260,41 @@ describe("mapRowsToReadings", () => {
       provider: "東京都水道局",
       usageUnit: "㎥",
     });
+  });
+
+  it("東京都水道局 meterdata 形式（使用月分=和暦・使用期間=1セル内範囲）を取り込める", () => {
+    const rows = [
+      ["お客さま番号", "合計請求金額（円）", "水道使用量（m3）", "使用月分", "使用期間"],
+      ["75-000000-00", "8193", "43", " 8年 6月 ～  8年 7月分", " 5月14日 ～  7月10日"],
+    ];
+    const mapping: CsvMapping = {
+      utility: "water",
+      buildingId: "b1",
+      hasHeader: true,
+      columns: { periodEnd: 3, periodStart: 4, amount: 1, usage: 2 },
+    };
+    const { readings, errors } = mapRowsToReadings(rows, mapping, new Date("2026-07-14"));
+    expect(errors).toEqual([]);
+    expect(readings[0]).toMatchObject({
+      utility: "water",
+      provider: "TokyoWaterworks",
+      periodStart: "2026-05-14",
+      periodEnd: "2026-07-10",
+      amountYen: 8193,
+      usageValue: 43,
+      usageUnit: "m³",
+    });
+  });
+
+  it("開始列の範囲表記が解釈できなければ終了月の月範囲にフォールバック", () => {
+    const rows = [["あ ～ い", "2026/07/31", "5000"]];
+    const { readings } = mapRowsToReadings(rows, {
+      utility: "water",
+      buildingId: "b1",
+      hasHeader: false,
+      columns: { periodStart: 0, periodEnd: 1, amount: 2 },
+    });
+    expect(readings[0]).toMatchObject({ periodStart: "2026-07-01", periodEnd: "2026-07-31" });
   });
 
   it("開始列が不正日付なら終了月の月範囲にフォールバック", () => {
@@ -289,6 +407,45 @@ describe("mapRowsToReadings", () => {
       expect(readings).toHaveLength(0);
       expect(errors).toEqual([{ row: 0, reason: "検針期間に該当する建物がありません" }]);
     });
+  });
+});
+
+describe("guessColumns / guessUtility", () => {
+  it("東京都水道局ヘッダから列と種別を推定する（今回料金より請求金額を優先）", () => {
+    const header = [
+      "お客さま番号",
+      "水道ご使用場所",
+      "使用者名",
+      "合計今回料金（円）",
+      "合計請求金額（円）",
+      "水道使用量（m3）",
+      "使用月分",
+      "使用期間",
+    ];
+    expect(guessColumns(header)).toEqual({ periodEnd: 6, periodStart: 7, amount: 4, usage: 5 });
+    expect(guessUtility(header)).toBe("water");
+  });
+
+  it("TEPCO・LPIO 形式のヘッダも推定できる", () => {
+    expect(guessColumns(["年月", "使用量(kWh)", "請求額(円)"])).toEqual({
+      periodEnd: 0,
+      periodStart: null,
+      amount: 2,
+      usage: 1,
+    });
+    expect(guessUtility(["年月", "使用量(kWh)", "請求額(円)"])).toBe("electricity");
+    expect(guessColumns(["年月", "使用量", "ご利用金額"])).toEqual({
+      periodEnd: 0,
+      periodStart: null,
+      amount: 2,
+      usage: 1,
+    });
+    expect(guessUtility(["年月", "ガス使用量", "ご利用金額"])).toBe("gas");
+  });
+
+  it("該当しない列・種別は null", () => {
+    expect(guessColumns(["a", "b"])).toEqual({ periodEnd: null, periodStart: null, amount: null, usage: null });
+    expect(guessUtility(["a", "b"])).toBeNull();
   });
 });
 
