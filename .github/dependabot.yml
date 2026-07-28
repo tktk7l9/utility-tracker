@@ -13,3 +13,14 @@ updates:
       npm-major:
         update-types:
           - "major"
+    ignore:
+      # ESLint 10: eslint-config-next bundles eslint-plugin-react, which
+      # crashes under ESLint 10's new rule-context API. Remove once
+      # eslint-config-next ships a compatible eslint-plugin-react.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7: Next.js 16.2.x build refuses it ("does not provide
+      # the compiler API required by Next.js"). Remove once Next.js
+      # supports TypeScript 7 without the experimental flag.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
