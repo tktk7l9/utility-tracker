@@ -44,7 +44,7 @@
   },
   "overrides": {
     "postcss": "^8.5.10",
-    "undici": "^7.28.0",
+    "undici": "^7.29.0",
     "sharp": "^0.35.0",
     "minimatch": "^10.2.4",
     "brace-expansion": "^5.0.8"
