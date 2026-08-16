@@ -1,0 +1,21 @@
+/**
+ * 光熱費トラッカー — Cloudflare Workers 設定
+ * https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/
+ *
+ * Next.js を @opennextjs/cloudflare でビルドして Workers で動かす。
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "utility-tracker",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-16",
+  // Next.js の実行に必須。日付は 2024-09-23 以降であること。
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+}
