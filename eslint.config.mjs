@@ -6,6 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   globalIgnores([
+    // OpenNext / wrangler build output (generated)
+    ".open-next/**",
+    ".wrangler/**",
     ".next/**",
     "out/**",
     "build/**",
