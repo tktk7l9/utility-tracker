@@ -33,3 +33,7 @@ next-env.d.ts
 
 # 実消費データを含む取込スクリプトはローカル限定（公開しない）
 scripts/import-*.mjs
+
+# Cloudflare Workers のビルド成果物とローカル状態
+.open-next
+.wrangler
