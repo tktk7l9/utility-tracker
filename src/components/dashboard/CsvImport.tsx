@@ -29,7 +29,7 @@ function ColSelect({
 }) {
   return (
     <select
-      className={selectClass}
+      className={`${selectClass} w-full`}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
     >
@@ -161,7 +161,8 @@ export function CsvImport({
   }
 
   return (
-    <div className="space-y-4">
+    // 入力タブでは半幅カードに置かれるため、列数は画面幅ではなくこの要素の幅で決める。
+    <div className="@container space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label>種別</Label>
@@ -214,7 +215,7 @@ export function CsvImport({
 
       {rows.length > 0 && (
         <>
-          <div className="grid gap-3 rounded-md border bg-muted/40 p-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 rounded-md border bg-muted/40 p-3 @xs:grid-cols-2 @2xl:grid-cols-4">
             <label className="col-span-full flex items-center gap-2 text-sm">
               <input type="checkbox" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} />
               1行目はヘッダ
@@ -255,8 +256,8 @@ export function CsvImport({
                   <tr>
                     <th className="px-3 py-2">建物</th>
                     <th className="px-3 py-2">期間</th>
-                    <th className="px-3 py-2">金額</th>
-                    <th className="px-3 py-2">使用量</th>
+                    <th className="whitespace-nowrap px-3 py-2">金額</th>
+                    <th className="whitespace-nowrap px-3 py-2">使用量</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,8 +267,8 @@ export function CsvImport({
                       <td className="px-3 py-1.5">
                         {r.periodStart} 〜 {r.periodEnd}
                       </td>
-                      <td className="px-3 py-1.5">{formatYen(r.amountYen)}</td>
-                      <td className="px-3 py-1.5">{r.usageValue ?? "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">{formatYen(r.amountYen)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">{r.usageValue ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
