@@ -20,7 +20,7 @@ interface Row {
   usage_value: number | null;
   usage_unit: string | null;
   note: string | null;
-  source: "manual" | "csv";
+  source: Reading["source"];
 }
 
 interface BuildingRow {

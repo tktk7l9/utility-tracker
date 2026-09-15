@@ -118,6 +118,39 @@ describe("toMonthlySeries", () => {
     ]);
     expect(series).toEqual([]);
   });
+
+  it("前の期間の終了日と次の期間の開始日が同じ日なら、その日は前の期間にだけ数える（金額は保存される）", () => {
+    const series = toMonthlySeries([
+      reading({ utility: "gas", periodStart: "2026-06-04", periodEnd: "2026-07-06", amountYen: 3300, usageValue: 33, usageUnit: "m³" }),
+      reading({ utility: "gas", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3100, usageValue: 31, usageUnit: "m³" }),
+    ]);
+    expect(series.map((b) => b.month)).toEqual(["2026-06", "2026-07", "2026-08"]);
+    // 前: 6/4〜7/6 の33日（6月27日・7月6日）。後: 境目の7/6を除いた 7/7〜8/6 の31日（7月25日・8月6日）。
+    expect(series[0].gas).toBeCloseTo(2700, 6); // 3300 * 27/33
+    expect(series[1].gas).toBeCloseTo(3100, 6); // 3300 * 6/33 + 3100 * 25/31
+    expect(series[2].gas).toBeCloseTo(600, 6); // 3100 * 6/31
+    expect(series[1].usage.gas).toBeCloseTo(31, 6); // 33 * 6/33 + 31 * 25/31
+    expect(series.reduce((sum, b) => sum + b.gas, 0)).toBeCloseTo(6400, 6);
+  });
+
+  it("境目が同じ日でも建物か光熱費が違えば、それぞれの期間をそのまま数える", () => {
+    const series = toMonthlySeries([
+      reading({ utility: "gas", buildingId: "b1", periodStart: "2026-06-04", periodEnd: "2026-07-06", amountYen: 3300 }),
+      reading({ utility: "gas", buildingId: "b2", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3200 }),
+      reading({ utility: "water", buildingId: "b1", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3200 }),
+    ]);
+    // 7/6〜8/6 の32日（7月26日・8月6日）で按分される。
+    expect(series[2].gas).toBeCloseTo(600, 6); // 3200 * 6/32
+    expect(series[2].water).toBeCloseTo(600, 6);
+  });
+
+  it("1日だけの期間は境目が同じ日でも除かない（金額が消えないように）", () => {
+    const series = toMonthlySeries([
+      reading({ utility: "gas", periodStart: "2026-07-01", periodEnd: "2026-07-06", amountYen: 600 }),
+      reading({ utility: "gas", periodStart: "2026-07-06", periodEnd: "2026-07-06", amountYen: 100 }),
+    ]);
+    expect(series[0].gas).toBeCloseTo(700, 6);
+  });
 });
 
 describe("mergeIntervals", () => {

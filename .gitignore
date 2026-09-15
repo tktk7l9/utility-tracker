@@ -37,3 +37,6 @@ scripts/import-*.mjs
 # Cloudflare Workers のビルド成果物とローカル状態
 .open-next
 .wrangler
+
+# PDF.js の CMap（dev/build 前に pdfjs-dist からコピーして配信する。エルピオ請求書の日本語抽出に必須）
+/public/cmaps

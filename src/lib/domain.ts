@@ -3,7 +3,7 @@
 
 export type Utility = "electricity" | "gas" | "water";
 
-export type ReadingSource = "manual" | "csv";
+export type ReadingSource = "manual" | "csv" | "pdf";
 
 /**
  * 住まい（建物）。1行 = 1つの居住期間で、引っ越し記録を兼ねる
