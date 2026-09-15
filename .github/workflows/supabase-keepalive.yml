@@ -1,0 +1,36 @@
+name: Supabase keep-alive
+
+# Supabase 無料プランは 1 週間 DB への問い合わせがないと自動で一時停止する。
+# 光熱費の入力は月 1 回程度なので、放置すると使うたびに停止してログインが
+# 「Failed to fetch」になる（停止中は <ref>.supabase.co の DNS が消える）。
+# 公式の目安は「毎日数回のリクエスト」なので、毎日 1 回 REST で readings を読む。
+# RLS で anon には 0 件しか返らないが、クエリ自体は DB で実行される。
+# 停止していたらジョブを落とし、GitHub の失敗通知メールで気づけるようにする。
+
+on:
+  schedule:
+    - cron: "17 21 * * *" # 毎日 06:17 JST。毎時 0 分は GitHub 側が混んで遅延しやすい
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query readings via PostgREST
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          status=$(curl -sS -m 30 --retry 3 --retry-delay 10 -o response.json -w '%{http_code}' \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/readings?select=id&limit=1") || status=000
+          echo "HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Supabase が HTTP $status を返しました。000 は停止中（DNS なし）の可能性が高いので Dashboard から Restore してください"
+            cat response.json 2>/dev/null || true
+            exit 1
+          fi
