@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UTILITIES, type Building, type NewBuilding, type NewReading, type Reading } from "@/lib/domain";
 import { toMonthlySeries, trimIncompleteEnds } from "@/lib/aggregate";
-import { readingKey } from "@/lib/csv";
 import { toCsv, toExportJson, exportFilename } from "@/lib/export";
 import {
   bulkUpsert,
@@ -77,8 +76,6 @@ export function Dashboard() {
   );
   const rawMonthly = useMemo(() => toMonthlySeries(visibleReadings), [visibleReadings]);
   const monthly = useMemo(() => trimIncompleteEnds(rawMonthly), [rawMonthly]);
-  // 建物軸を含むキーなので、重複判定は建物間で混ざらない（全件から生成する）。
-  const existingKeys = useMemo(() => readings.map(readingKey), [readings]);
   const buildingNameById = useMemo(() => new Map(buildings.map((b) => [b.id, b.name])), [buildings]);
   const readingCountsByBuilding = useMemo(() => {
     const counts = new Map<string, number>();
@@ -228,13 +225,13 @@ export function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">CSV 取込</CardTitle>
+            <CardTitle className="text-base">CSV・PDF 取込</CardTitle>
           </CardHeader>
           <CardContent>
             <CsvImport
               buildings={buildings}
               defaultBuildingId={defaultBuildingId}
-              existingKeys={existingKeys}
+              existingReadings={readings}
               onImport={handleImport}
             />
           </CardContent>
@@ -363,7 +360,7 @@ function RecordList({
                     {r.usageValue != null ? `${r.usageValue} ${r.usageUnit ?? meta.unit}` : "—"}
                   </td>
                   <td className="px-2 py-1.5">
-                    <Badge variant={r.source === "csv" ? "secondary" : "outline"}>{r.source}</Badge>
+                    <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{r.source}</Badge>
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex justify-end gap-1">

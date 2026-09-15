@@ -16,9 +16,10 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       // include を明示し、テストに触れられていない純粋ロジックも 0% として可視化する（盲点を出す）。
-      // supabase.ts はネットワーク層のため計測対象外（lifeplan-me の InteractiveMap 除外と同方針）。
+      // supabase.ts はネットワーク層、pdfText.ts はブラウザ専用の PDF.js 呼び出し層のため計測対象外
+      // （lifeplan-me の InteractiveMap 除外と同方針。請求書テキストの解析本体 pdfBill.ts は計測する）。
       include: ["src/lib/**/*.ts"],
-      exclude: ["**/*.test.{ts,tsx}", "src/lib/supabase.ts", "src/test-setup.ts"],
+      exclude: ["**/*.test.{ts,tsx}", "src/lib/supabase.ts", "src/lib/pdfText.ts", "src/test-setup.ts"],
       reporter: ["text", "html"],
       // 集計・CSV 正規化の正本ロジックは statements/functions/lines を 100% 維持（回帰でCIを落とす）。
       thresholds: {
