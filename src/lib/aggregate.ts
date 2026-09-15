@@ -103,15 +103,25 @@ export function monthOverlaps(coverage: Array<[number, number]>, monthKey: strin
   return coverage.some(([a, b]) => a <= last && b >= first);
 }
 
+/** "YYYY-MM-DD" の翌日。 */
+function nextDay(iso: string): string {
+  const dt = new Date(toUTC(iso) + DAY_MS);
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+}
+
 /**
  * レコード群を月次バケットの昇順配列に集計する。各期間の金額・使用量は日割りで
  * カレンダー月に按分される。
  */
 export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
   const map = new Map<string, MonthlyBucket>();
+  // 前の期間の終了日と次の期間の開始日が同じ日（エルピオのように検針日で区切る請求書）は、
+  // その日を前の期間にだけ数える。両方に数えると境目の日に2件分が按分され、月の配分が偏る。
+  const periodEnds = new Set(readings.map((r) => `${r.buildingId}|${r.utility}|${r.periodEnd}`));
 
   for (const r of readings) {
-    const perMonth = daysPerMonth(r.periodStart, r.periodEnd);
+    const sharesStart = r.periodStart < r.periodEnd && periodEnds.has(`${r.buildingId}|${r.utility}|${r.periodStart}`);
+    const perMonth = daysPerMonth(sharesStart ? nextDay(r.periodStart) : r.periodStart, r.periodEnd);
     const totalDays = Object.values(perMonth).reduce((a, b) => a + b, 0);
     if (totalDays === 0) continue;
 
