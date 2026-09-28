@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession, isConfigured, onAuthChange, signIn } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [configured] = useState(() => isConfigured());
@@ -75,7 +76,7 @@ function SignInForm() {
     try {
       await signIn(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -103,7 +104,11 @@ function SignInForm() {
               required
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "認証中…" : "ログイン"}
           </Button>

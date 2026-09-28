@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { UTILITIES, UTILITY_ORDER, utilityMeta, isUtility } from "./domain";
+import { UTILITIES, UTILITY_ORDER, utilityMeta, isUtility, SOURCE_LABELS } from "./domain";
 
 describe("domain", () => {
   it("UTILITIES に3社が定義され既定値を持つ", () => {
@@ -23,5 +23,9 @@ describe("domain", () => {
     expect(isUtility("water")).toBe(true);
     expect(isUtility("internet")).toBe(false);
     expect(isUtility("")).toBe(false);
+  });
+
+  it("SOURCE_LABELS shows how a record was entered in plain words", () => {
+    expect(SOURCE_LABELS).toEqual({ manual: "手入力", csv: "CSV", pdf: "PDF" });
   });
 });

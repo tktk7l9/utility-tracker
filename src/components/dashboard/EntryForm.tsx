@@ -9,6 +9,7 @@ import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Reading,
 import { inferBuilding } from "@/lib/buildings";
 import { parseLenientNumber } from "@/lib/number";
 import { suggestPeriod } from "@/lib/period";
+import { friendlyError } from "@/lib/errors";
 
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -96,7 +97,7 @@ export function EntryForm({
       setPeriodStart(next.periodStart);
       setPeriodEnd(next.periodEnd);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }

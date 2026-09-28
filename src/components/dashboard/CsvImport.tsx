@@ -14,7 +14,8 @@ import { parseBillText, type ParsedBill } from "@/lib/pdfBill";
 import { extractPdfText } from "@/lib/pdfText";
 import { findPeriodOverlaps } from "@/lib/overlaps";
 import { decodeCsv, type CsvEncoding } from "@/lib/encoding";
-import { formatYen } from "@/lib/utils";
+import { formatPeriod, formatYen } from "@/lib/utils";
+import { friendlyError } from "@/lib/errors";
 
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -250,7 +251,7 @@ export function CsvImport({
       setRawText("");
       setPdfFiles([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -404,8 +405,8 @@ export function CsvImport({
               <ul className="space-y-0.5 text-xs">
                 {overlaps.map(({ incoming, existing }) => (
                   <li key={`${existing.id}|${readingKey(incoming)}`}>
-                    {UTILITIES[existing.utility].label}：登録済み {existing.periodStart} 〜 {existing.periodEnd}（
-                    {formatYen(existing.amountYen)}）と、取込 {incoming.periodStart} 〜 {incoming.periodEnd}
+                    {UTILITIES[existing.utility].label}：登録済み {formatPeriod(existing.periodStart, existing.periodEnd)}（
+                    {formatYen(existing.amountYen)}）と、取込 {formatPeriod(incoming.periodStart, incoming.periodEnd)}
                   </li>
                 ))}
               </ul>
@@ -429,9 +430,7 @@ export function CsvImport({
                     <tr key={i} className="border-t">
                       {mode === "pdf" && <td className="whitespace-nowrap px-3 py-1.5">{UTILITIES[r.utility].label}</td>}
                       <td className="px-3 py-1.5">{buildingNameById.get(r.buildingId) ?? r.buildingId}</td>
-                      <td className="px-3 py-1.5">
-                        {r.periodStart} 〜 {r.periodEnd}
-                      </td>
+                      <td className="whitespace-nowrap px-3 py-1.5">{formatPeriod(r.periodStart, r.periodEnd)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">{formatYen(r.amountYen)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">{r.usageValue ?? "—"}</td>
                     </tr>

@@ -81,6 +81,13 @@ export const UTILITIES: Record<Utility, UtilityMeta> = {
   },
 };
 
+/** How a record was entered, in the words shown on screen (SHIG 11). */
+export const SOURCE_LABELS: Record<ReadingSource, string> = {
+  manual: "手入力",
+  csv: "CSV",
+  pdf: "PDF",
+};
+
 /** 積み上げ・凡例の表示順。 */
 export const UTILITY_ORDER: Utility[] = ["electricity", "gas", "water"];
 

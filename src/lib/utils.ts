@@ -23,3 +23,18 @@ export function formatPercent(ratio: number, digits = 1): string {
   const sign = pct > 0 ? "+" : "";
   return `${sign}${pct.toFixed(digits)}%`;
 }
+
+/** "2026-07-01" -> "2026/07/01". */
+export function formatDate(iso: string): string {
+  return iso.replaceAll("-", "/");
+}
+
+/**
+ * Short period text: "2026/07/01〜08/31" (the end drops the year when it is the same),
+ * "2025/12/15〜2026/01/14" across years, "2025/04/01〜" when the end is open.
+ */
+export function formatPeriod(start: string, end: string | null): string {
+  if (end == null) return `${formatDate(start)}〜`;
+  const endText = end.slice(0, 4) === start.slice(0, 4) ? formatDate(end.slice(5)) : formatDate(end);
+  return `${formatDate(start)}〜${endText}`;
+}

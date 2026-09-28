@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import type { Building, NewBuilding } from "@/lib/domain";
 import { sortBuildings, isCurrentResidence } from "@/lib/buildings";
+import { friendlyError } from "@/lib/errors";
+import { formatDate } from "@/lib/utils";
 
 export function BuildingManager({
   buildings,
@@ -59,7 +61,7 @@ export function BuildingManager({
                   <tr className="border-t">
                     <td className="px-2 py-1.5">{b.name}</td>
                     <td className="px-2 py-1.5 whitespace-nowrap text-muted-foreground">
-                      {b.movedInOn} 〜 {isCurrentResidence(b) ? <Badge variant="outline">現住</Badge> : b.movedOutOn}
+                      {formatDate(b.movedInOn)}〜{isCurrentResidence(b) ? <Badge variant="outline">現住</Badge> : formatDate(b.movedOutOn ?? "")}
                     </td>
                     <td className="px-2 py-1.5 text-right text-muted-foreground">{count}</td>
                     <td className="px-2 py-1.5">
@@ -155,7 +157,7 @@ function BuildingEditRow({
     try {
       await onSave({ name: name.trim(), movedInOn, movedOutOn: movedOutOn === "" ? null : movedOutOn });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
       setBusy(false);
     }
   }
@@ -223,7 +225,7 @@ function BuildingAddForm({
       setMovedInOn("");
       setMovedOutOn("");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
     } finally {
       setBusy(false);
     }

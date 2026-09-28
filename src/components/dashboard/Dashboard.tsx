@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Trash2, Pencil, Check, X, Download } from "lucide-react";
+import { Trash2, Pencil, Check, X, Download, RotateCw, LogIn } from "lucide-react";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UTILITIES, type Building, type NewBuilding, type NewReading, type Reading } from "@/lib/domain";
+import { SOURCE_LABELS, UTILITIES, type Building, type NewBuilding, type NewReading, type Reading } from "@/lib/domain";
 import { toMonthlySeries, trimIncompleteEnds } from "@/lib/aggregate";
 import { toCsv, toExportJson, exportFilename } from "@/lib/export";
 import {
@@ -20,11 +20,13 @@ import {
   fetchReadings,
   insertBuilding,
   insertReading,
+  signOut,
   updateBuilding,
   updateReading,
 } from "@/lib/supabase";
 import { parseLenientNumber } from "@/lib/number";
-import { formatYen } from "@/lib/utils";
+import { formatPeriod, formatYen } from "@/lib/utils";
+import { friendlyError } from "@/lib/errors";
 
 import { SummaryCards } from "./SummaryCards";
 import { ProviderLinks } from "./ProviderLinks";
@@ -64,7 +66,7 @@ export function Dashboard() {
         setReadings(r);
         setBuildings(b);
       })
-      .catch((e) => active && setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => active && setError(friendlyError(e)))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -128,10 +130,18 @@ export function Dashboard() {
   if (error) {
     return (
       <Card>
-        <CardContent className="space-y-1 py-8 text-center text-sm">
-          <p className="text-destructive">データの取得に失敗しました。</p>
-          <p className="text-muted-foreground">{error}</p>
-          <p className="text-muted-foreground">RLS 適用後は該当ユーザーでログインが必要です。</p>
+        <CardContent className="space-y-3 py-8 text-center text-sm">
+          <p role="alert" className="text-destructive">
+            データを読み込めませんでした。{error}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              <RotateCw className="size-4" /> 再読み込み
+            </Button>
+            <Button variant="ghost" onClick={() => signOut()}>
+              <LogIn className="size-4" /> ログインし直す
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -173,7 +183,7 @@ export function Dashboard() {
               )}
               {trimmedCount > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ※ データ端の部分月（検針期間が月全体を覆わない {trimmedCount} 月）は、合計が過小に見えるため比較グラフから除外しています。
+                  ※ 最初と最後の月は日数が足りないため、グラフに含めていません（{trimmedCount} か月）。
                 </p>
               )}
             </CardContent>
@@ -333,7 +343,7 @@ function RecordList({
             <th className="px-2 py-2">検針期間</th>
             <th className="px-2 py-2 text-right">金額</th>
             <th className="px-2 py-2 text-right">使用量</th>
-            <th className="px-2 py-2">元</th>
+            <th className="px-2 py-2">入力方法</th>
             <th className="px-2 py-2" />
           </tr>
         </thead>
@@ -353,15 +363,13 @@ function RecordList({
                   <td className="px-2 py-1.5 whitespace-nowrap text-muted-foreground">
                     {buildingNameById.get(r.buildingId) ?? r.buildingId}
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap">
-                    {r.periodStart} 〜 {r.periodEnd}
-                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{formatPeriod(r.periodStart, r.periodEnd)}</td>
                   <td className="px-2 py-1.5 text-right">{formatYen(r.amountYen)}</td>
                   <td className="px-2 py-1.5 text-right text-muted-foreground">
                     {r.usageValue != null ? `${r.usageValue} ${r.usageUnit ?? meta.unit}` : "—"}
                   </td>
                   <td className="px-2 py-1.5">
-                    <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{r.source}</Badge>
+                    <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{SOURCE_LABELS[r.source]}</Badge>
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex justify-end gap-1">
@@ -461,7 +469,7 @@ function EditRow({
         note: note.trim() || null,
       });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(friendlyError(e));
       setBusy(false);
     }
   }

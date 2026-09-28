@@ -11,9 +11,6 @@ export default function Home() {
             <span aria-hidden className="mr-2">💡</span>
             光熱費トラッカー
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            電気(TEPCO)・ガス(LPIO)・水道(東京都水道局)の料金と使用量を集約し、月別推移・使用量/単価・前年同月比を可視化。
-          </p>
         </div>
         <AccountControls />
       </header>
