@@ -166,6 +166,19 @@ describe("normalizeDateRange", () => {
     });
   });
 
+  it("treats a missing day as the 1st when comparing sides within the same month", () => {
+    // Start without a day: the 1st never comes after the end, so the year stays.
+    expect(normalizeDateRange("6月 ～ 6月30日", "2026-06-30", today)).toEqual({
+      start: "2026-06-01",
+      end: "2026-06-30",
+    });
+    // End without a day: a start after the 1st is read as the previous year.
+    expect(normalizeDateRange("6月20日 ～ 6月", "2026-06-30", today)).toEqual({
+      start: "2025-06-20",
+      end: "2026-06-01",
+    });
+  });
+
   it("解釈不能・区切りが2側でない・範囲外は null", () => {
     expect(normalizeDateRange(null, "2026-07-01", today)).toBeNull();
     expect(normalizeDateRange("2026/6/1", "2026-07-01", today)).toBeNull();
