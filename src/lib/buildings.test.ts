@@ -17,7 +17,7 @@ describe("overlapDays", () => {
 
   it("部分的な重なりは重なった日数のみ", () => {
     const b = mk("a", "A", "2026-06-15", "2026-12-31");
-    expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(16); // 6/15〜6/30
+    expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(16); // 6/15-6/30
   });
 
   it("重なりなしは 0", () => {
@@ -32,7 +32,7 @@ describe("overlapDays", () => {
 
   it("退去日 null（現住）は期間終了日まで居住とみなす", () => {
     const b = mk("a", "A", "2026-06-10", null);
-    expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(21); // 6/10〜6/30
+    expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(21); // 6/10-6/30
   });
 
   it("期間逆転（終了<開始）は 0", () => {
@@ -54,14 +54,14 @@ describe("inferBuilding", () => {
   });
 
   it("重なり日数が最大の建物を返す（引っ越しまたぎの検針期間）", () => {
-    // 6/1〜6/30: 旧居 14 日・新居 16 日 → 新居
+    // 6/1-6/30: 14 days at the old home, 16 at the new one -> new home
     expect(inferBuilding([oldHome, newHome], "2026-06-01", "2026-06-30")?.id).toBe("new");
-    // 配列順を逆にしても同じ（少ない方が最大値を上書きしない）
+    // Same result with the array reversed (the smaller overlap never overwrites the maximum)
     expect(inferBuilding([newHome, oldHome], "2026-06-01", "2026-06-30")?.id).toBe("new");
   });
 
   it("重なり同数のタイは入居日が新しい方（引っ越し当日は新居優先）", () => {
-    // 6/14〜6/15: 旧居 1 日（6/14）・新居 1 日（6/15）
+    // 6/14-6/15: 1 day at the old home (6/14), 1 day at the new one (6/15)
     expect(inferBuilding([oldHome, newHome], "2026-06-14", "2026-06-15")?.id).toBe("new");
     expect(inferBuilding([newHome, oldHome], "2026-06-14", "2026-06-15")?.id).toBe("new");
   });
@@ -74,7 +74,7 @@ describe("sortBuildings", () => {
     const c = mk("c", "あ", "2026-06-15");
     const input = [a, b, c];
     expect(sortBuildings(input).map((x) => x.id)).toEqual(["b", "c", "a"]);
-    expect(input.map((x) => x.id)).toEqual(["a", "b", "c"]); // 非破壊
+    expect(input.map((x) => x.id)).toEqual(["a", "b", "c"]); // Non-destructive
   });
 });
 

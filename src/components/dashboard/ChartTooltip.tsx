@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * ReferenceLine 用のラベル。背景色の縁取り（halo）を付けて、グリッドやバーの上でも
- * テキストが読みやすいようにする。viewBox は recharts が注入する。
+ * Label for ReferenceLine. Adds a background-colored outline (halo) so the text stays
+ * readable over grid lines and bars. recharts injects viewBox.
  */
 export function RefLineLabel({
   viewBox,
@@ -46,7 +46,7 @@ interface TooltipEntry {
   dataKey?: string | number;
 }
 
-/** recharts 共通のカスタムツールチップ（角丸カード・色ドット・右寄せ数値）。 */
+/** Shared custom tooltip for recharts (rounded card, color dots, right-aligned numbers). */
 export function ChartTooltip({
   active,
   payload,

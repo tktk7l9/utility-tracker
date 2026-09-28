@@ -1,15 +1,15 @@
 name: Supabase keep-alive
 
-# Supabase 無料プランは 1 週間 DB への問い合わせがないと自動で一時停止する。
-# 光熱費の入力は月 1 回程度なので、放置すると使うたびに停止してログインが
-# 「Failed to fetch」になる（停止中は <ref>.supabase.co の DNS が消える）。
-# 公式の目安は「毎日数回のリクエスト」なので、毎日 1 回 REST で readings を読む。
-# RLS で anon には 0 件しか返らないが、クエリ自体は DB で実行される。
-# 停止していたらジョブを落とし、GitHub の失敗通知メールで気づけるようにする。
+# The Supabase free plan pauses a project automatically after a week without DB queries.
+# Utility bills are entered only about once a month, so left alone it is paused every time and login
+# fails with "Failed to fetch" (the DNS for <ref>.supabase.co disappears while paused).
+# The official guideline is "a few requests a day", so read readings over REST once a day.
+# RLS returns 0 rows to anon, but the query itself still runs in the DB.
+# If the project is paused, fail the job so GitHub's failure email tells us.
 
 on:
   schedule:
-    - cron: "17 21 * * *" # 毎日 06:17 JST。毎時 0 分は GitHub 側が混んで遅延しやすい
+    - cron: "17 21 * * *" # Daily at 06:17 JST. The top of the hour is busy on GitHub and often delayed
   workflow_dispatch:
 
 permissions: {}

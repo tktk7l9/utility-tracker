@@ -23,7 +23,7 @@ function shortMonth(month: string): string {
   return `${y.slice(2)}/${m}`;
 }
 
-/** 凡例を 合計 → 電気 → ガス → 水道 の順で描画（合計は線アイコン）。 */
+/** Draws the legend in the order total -> electricity -> gas -> water (total uses a line icon). */
 function CostLegend() {
   return (
     <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-3 text-xs text-muted-foreground">

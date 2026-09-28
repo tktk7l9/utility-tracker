@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** 数値を「1,234円」形式に（四捨五入）。 */
+/** Formats a number as 「1,234円」 (rounded). */
 export function formatYen(value: number): string {
   return `${Math.round(value).toLocaleString("ja-JP")}円`;
 }
@@ -15,14 +15,14 @@ export function formatSignedYen(value: number): string {
   return `${value > 0 ? "+" : ""}${formatYen(value)}`;
 }
 
-/** 小数を桁指定で丸めて日本語ロケール表示（末尾ゼロは残さない）。 */
+/** Rounds a decimal to the given digits and formats it in the Japanese locale (no trailing zeros). */
 export function formatNumber(value: number, digits = 1): string {
   const factor = 10 ** digits;
   const rounded = Math.round(value * factor) / factor;
   return rounded.toLocaleString("ja-JP", { maximumFractionDigits: digits });
 }
 
-/** 増減率（-0.12 → 「-12.0%」, 正なら「+」を付与）。 */
+/** Rate of change (-0.12 -> 「-12.0%」; positive values get a 「+」). */
 export function formatPercent(ratio: number, digits = 1): string {
   const pct = ratio * 100;
   const sign = pct > 0 ? "+" : "";

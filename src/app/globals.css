@@ -11,7 +11,7 @@
   --popover: oklch(1 0.002 240);
   --popover-foreground: oklch(0.22 0.02 250);
 
-  /* 白文字(primary-foreground)で AA(4.5:1) を満たすよう十分暗い青に。 */
+  /* A blue dark enough for white text (primary-foreground) to meet AA (4.5:1). */
   --primary: oklch(0.51 0.12 232);
   --primary-foreground: oklch(1 0 0);
 
@@ -19,7 +19,7 @@
   --secondary-foreground: oklch(0.30 0.03 245);
 
   --muted: oklch(0.96 0.008 235);
-  /* WCAG AA(4.5:1) を満たすよう背景に対して十分暗く（ラベル・説明文で使用）。 */
+  /* Dark enough against the background to meet WCAG AA (4.5:1) (used for labels and descriptions). */
   --muted-foreground: oklch(0.44 0.02 250);
 
   --accent: oklch(0.95 0.02 220);

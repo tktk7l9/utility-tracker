@@ -31,12 +31,12 @@ yarn-error.log*
 next-env.d.ts
 .vercel
 
-# 実消費データを含む取込スクリプトはローカル限定（公開しない）
+# Import scripts that contain real consumption data stay local (never published)
 scripts/import-*.mjs
 
-# Cloudflare Workers のビルド成果物とローカル状態
+# Cloudflare Workers build output and local state
 .open-next
 .wrangler
 
-# PDF.js の CMap（dev/build 前に pdfjs-dist からコピーして配信する。エルピオ請求書の日本語抽出に必須）
+# PDF.js CMaps (copied from pdfjs-dist before dev/build and served; required to extract Japanese text from LPIO (エルピオ) bills)
 /public/cmaps

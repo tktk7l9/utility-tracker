@@ -81,12 +81,12 @@ describe("normalizeDate", () => {
   });
   it("2桁年は西暦20xx／令和のうち today に近い方（LPIO「26年06月」・水道局「8年 6月」）", () => {
     const today = new Date("2026-07-14");
-    expect(normalizeDate("26年06月", today)).toBe("2026-06-01"); // 西暦2026 が令和26(2044)より近い
+    expect(normalizeDate("26年06月", today)).toBe("2026-06-01"); // Gregorian 2026 is closer than Reiwa 26 (2044)
     expect(normalizeDate("25年12月", today)).toBe("2025-12-01");
     expect(normalizeDate("26/6/1", today)).toBe("2026-06-01");
-    expect(normalizeDate("8年 6月", today)).toBe("2026-06-01"); // 令和8(2026) が西暦2008より近い
-    expect(normalizeDate("00年01月", today)).toBe("2000-01-01"); // 令和0年は存在しない → 西暦
-    expect(normalizeDate("8年1月", new Date("2017-06-01"))).toBe("2008-01-01"); // 同距離なら西暦
+    expect(normalizeDate("8年 6月", today)).toBe("2026-06-01"); // Reiwa 8 (2026) is closer than Gregorian 2008
+    expect(normalizeDate("00年01月", today)).toBe("2000-01-01"); // Reiwa 0 does not exist -> Gregorian
+    expect(normalizeDate("8年1月", new Date("2017-06-01"))).toBe("2008-01-01"); // Gregorian on a tie
   });
   it("和暦＋範囲＋「分」（東京都水道局「使用月分」）は終端側を採る", () => {
     const today = new Date("2026-07-14");
@@ -97,7 +97,7 @@ describe("normalizeDate", () => {
     expect(normalizeDate("5月14日")).toBeNull();
     expect(normalizeDate("6月")).toBeNull();
     expect(normalizeDate("10日")).toBeNull();
-    expect(normalizeDate("8年月")).toBeNull(); // 崩れた表記
+    expect(normalizeDate("8年月")).toBeNull(); // Malformed notation
   });
   it("解釈不能・範囲外・null は null", () => {
     expect(normalizeDate("")).toBeNull();
@@ -126,7 +126,7 @@ describe("normalizeDateRange", () => {
       start: "2025-11-14",
       end: "2026-01-10",
     });
-    // 同月内で日が逆転しているケースも同じ規則
+    // Days reversed within the same month follow the same rule
     expect(normalizeDateRange("6月20日 ～ 6月10日", "2026-06-30", today)).toEqual({
       start: "2025-06-20",
       end: "2026-06-10",
@@ -324,7 +324,7 @@ describe("mapRowsToReadings", () => {
 
   it("使用量列なし／空セルは使用量 null・単位 null", () => {
     const rows = [
-      ["2026/06", "", "3000"], // usage 列は指定するが空
+      ["2026/06", "", "3000"], // usage column is mapped but empty
     ];
     const mapping: CsvMapping = {
       utility: "electricity",
@@ -336,7 +336,7 @@ describe("mapRowsToReadings", () => {
     expect(readings[0].usageValue).toBeNull();
     expect(readings[0].usageUnit).toBeNull();
 
-    // usage 列自体を指定しない場合も null
+    // null too when the usage column is not mapped at all
     const noUsage = mapRowsToReadings([["2026/06", "3000"]], {
       utility: "electricity",
       buildingId: "b1",
@@ -350,9 +350,9 @@ describe("mapRowsToReadings", () => {
     const rows = [
       ["年月", "請求額"],
       ["2026/06", "3000"], // ok  → dataRows[0] rowIndex 1
-      ["2026/06", "notnum"], // 金額不正 → rowIndex 2
-      ["baddate", "3000"], // 日付不正 → rowIndex 3
-      ["", ""], // 空行 → skip
+      ["2026/06", "notnum"], // invalid amount -> rowIndex 2
+      ["baddate", "3000"], // invalid date -> rowIndex 3
+      ["", ""], // blank row -> skip
     ];
     const mapping: CsvMapping = {
       utility: "electricity",
@@ -489,10 +489,10 @@ describe("readingKey / dedupe", () => {
   it("既存キー・ファイル内重複を duplicates に振り分ける（別建物は重複にしない）", () => {
     const incoming = [
       mk("electricity", "2026-06-01", "2026-06-30"),
-      mk("electricity", "2026-06-01", "2026-06-30"), // ファイル内重複
-      mk("water", "2026-05-01", "2026-06-30"), // 既存にあり
-      mk("gas", "2026-06-01", "2026-06-30"), // 新規
-      mk("water", "2026-05-01", "2026-06-30", "b2"), // 既存と同期間だが別建物 → 新規
+      mk("electricity", "2026-06-01", "2026-06-30"), // duplicate within the file
+      mk("water", "2026-05-01", "2026-06-30"), // already exists
+      mk("gas", "2026-06-01", "2026-06-30"), // new
+      mk("water", "2026-05-01", "2026-06-30", "b2"), // same period as an existing record but another building -> new
     ];
     const existing = ["b1|water|2026-05-01|2026-06-30"];
     const { toInsert, duplicates } = dedupe(incoming, existing);

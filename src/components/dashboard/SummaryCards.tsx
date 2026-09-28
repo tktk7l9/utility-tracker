@@ -40,7 +40,7 @@ export function SummaryCards({
   const up = yoyDelta != null && yoyDelta > 0;
   const down = yoyDelta != null && yoyDelta < 0;
   const Trend = up ? TrendingUp : down ? TrendingDown : Minus;
-  // 光熱費は下がる方が good（緑）、上がると warning（赤）。
+  // For utility costs, going down is good (green) and going up is a warning (red).
   const trendClass = up ? "text-destructive" : down ? "text-success" : "text-muted-foreground";
 
   const prevMonth = monthly.length >= 2 ? monthly[monthly.length - 2] : null;

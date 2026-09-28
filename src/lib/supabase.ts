@@ -1,7 +1,7 @@
-// Supabase クライアントと readings テーブルの CRUD / 認証ラッパ。
-// anon キーはクライアントに載って良い設計（実アクセス制御は RLS = supabase/rls.sql）。
-// NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を .env.local と
-// Vercel Project env に設定する。ネットワーク層のためカバレッジ計測対象外。
+// Supabase client plus CRUD / auth wrappers for the readings table.
+// The anon key is designed to ship to the client (actual access control is RLS = supabase/rls.sql).
+// Set NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and
+// the Vercel project env. Excluded from coverage as the network layer.
 
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import type { Building, NewBuilding, NewReading, Reading, Utility } from "./domain";
@@ -40,7 +40,7 @@ function newBuildingToRow(b: NewBuilding): Omit<BuildingRow, "id"> {
 
 let client: SupabaseClient | null | undefined;
 
-/** 環境変数があれば singleton クライアントを返す。未設定なら null。 */
+/** Returns the singleton client when the env vars are set, otherwise null. */
 export function getClient(): SupabaseClient | null {
   if (client !== undefined) return client;
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
@@ -96,7 +96,7 @@ function newReadingToRow(r: NewReading): Omit<Row, "id"> {
   };
 }
 
-// ── 認証 ────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────
 export async function getSession(): Promise<Session | null> {
   const c = getClient();
   if (!c) return null;
@@ -120,7 +120,7 @@ export async function signOut(): Promise<void> {
   await requireClient().auth.signOut();
 }
 
-// ── データ ──────────────────────────────────────────────────────────
+// ── Data ────────────────────────────────────────────────────────────
 export async function fetchReadings(): Promise<Reading[]> {
   const { data, error } = await requireClient()
     .from(TABLE)
@@ -141,8 +141,8 @@ export async function insertReading(reading: NewReading): Promise<Reading> {
 }
 
 /**
- * unique(user_id, building_id, utility, period_start, period_end) で衝突したら上書き（冪等な再取込）。
- * user_id は挿入行の default auth.uid() で埋まるため、ペイロードには含めない。
+ * Overwrites on conflict with unique(user_id, building_id, utility, period_start, period_end) (idempotent re-import).
+ * user_id is filled by the inserted row's default auth.uid(), so it is not in the payload.
  */
 export async function bulkUpsert(readings: NewReading[]): Promise<void> {
   if (readings.length === 0) return;
@@ -167,7 +167,7 @@ const FIELD_TO_COLUMN: Record<keyof NewReading, string> = {
   source: "source",
 };
 
-/** 指定フィールドのみ部分更新する。 */
+/** Partially updates only the given fields. */
 export async function updateReading(id: string, patch: Partial<NewReading>): Promise<Reading> {
   const row: Record<string, unknown> = {};
   for (const key of Object.keys(patch) as Array<keyof NewReading>) {
@@ -190,7 +190,7 @@ export async function deleteReadings(ids: string[]): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-// ── 建物 ────────────────────────────────────────────────────────────
+// ── Buildings ─────────────────────────────────────────────────────────
 export async function fetchBuildings(): Promise<Building[]> {
   const { data, error } = await requireClient()
     .from(BUILDINGS_TABLE)
@@ -220,7 +220,7 @@ export async function updateBuilding(id: string, patch: Partial<NewBuilding>): P
   return rowToBuilding(data as BuildingRow);
 }
 
-/** レコードが残る建物を削除しようとした場合（FK violation）は分かりやすいメッセージに変換する。 */
+/** Converts an attempt to delete a building that still has records (FK violation) into a clear message. */
 export async function deleteBuilding(id: string): Promise<void> {
   const { error } = await requireClient().from(BUILDINGS_TABLE).delete().eq("id", id);
   if (error) {

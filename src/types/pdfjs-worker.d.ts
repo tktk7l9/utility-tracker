@@ -1,3 +1,3 @@
-// pdfjs-dist はワーカー本体の型を同梱していない。pdfText.ts で import して
-// globalThis.pdfjsWorker に置く（メインスレッドで動かす）ためだけに宣言する。
+// pdfjs-dist does not ship types for the worker itself. Declared only so pdfText.ts can import it
+// and put it on globalThis.pdfjsWorker (to run it on the main thread).
 declare module "pdfjs-dist/build/pdf.worker.min.mjs";

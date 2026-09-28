@@ -1,59 +1,59 @@
-// 光熱費トラッカーのドメイン型と各社設定。
-// 純粋なデータ定義のみ（副作用なし）。集計・CSV・UI から共有する。
+// Domain types and per-provider settings for the utility tracker.
+// Pure data definitions only (no side effects). Shared by aggregation, CSV and UI.
 
 export type Utility = "electricity" | "gas" | "water";
 
 export type ReadingSource = "manual" | "csv" | "pdf";
 
 /**
- * 住まい（建物）。1行 = 1つの居住期間で、引っ越し記録を兼ねる
- * （同じ建物への出戻りは別レコード）。DB `buildings` テーブルの1行に対応。
+ * A home (building). One row = one residence period, doubling as the moving record
+ * (moving back to the same building is a separate record). Maps to one row of the DB `buildings` table.
  */
 export interface Building {
   id: string;
   name: string;
-  /** 入居日 (YYYY-MM-DD)。 */
+  /** Move-in date (YYYY-MM-DD). */
   movedInOn: string;
-  /** 退去日 (YYYY-MM-DD)。null = 現住。 */
+  /** Move-out date (YYYY-MM-DD). null = current home. */
   movedOutOn: string | null;
 }
 
-/** id を持たない新規建物（追加フォームの投入形）。 */
+/** A new building without an id (the shape submitted by the add form). */
 export type NewBuilding = Omit<Building, "id">;
 
-/** 1社・1検針期間の請求レコード（DB `readings` テーブルの1行に対応）。 */
+/** A bill record for one provider and one reading period (maps to one row of the DB `readings` table). */
 export interface Reading {
   id: string;
   utility: Utility;
   provider: string;
-  /** 建物（`buildings.id`）。 */
+  /** Building (`buildings.id`). */
   buildingId: string;
-  /** 検針期間の開始日 (YYYY-MM-DD)。 */
+  /** Start date of the reading period (YYYY-MM-DD). */
   periodStart: string;
-  /** 検針期間の終了日 (YYYY-MM-DD)。 */
+  /** End date of the reading period (YYYY-MM-DD). */
   periodEnd: string;
-  /** 税込請求額（円）。 */
+  /** Billed amount including tax (yen). */
   amountYen: number;
-  /** 使用量（電気=kWh / ガス・水道=m³）。金額のみ既知なら null。 */
+  /** Usage (electricity = kWh / gas and water = m³). null when only the amount is known. */
   usageValue: number | null;
-  /** 使用量の単位。 */
+  /** Usage unit. */
   usageUnit: string | null;
   note?: string | null;
   source: ReadingSource;
 }
 
-/** id を持たない新規レコード（手入力・CSV取込時の投入形）。 */
+/** A new record without an id (the shape submitted by manual entry and CSV import). */
 export type NewReading = Omit<Reading, "id">;
 
 export interface UtilityMeta {
   key: Utility;
-  /** 日本語表示名（電気/ガス/水道）。 */
+  /** Japanese display name (電気/ガス/水道). */
   label: string;
-  /** 既定の事業者名。 */
+  /** Default provider name. */
   provider: string;
-  /** 既定の使用量単位。 */
+  /** Default usage unit. */
   unit: string;
-  /** グラフ用の色（16進）。 */
+  /** Chart color (hex). */
   color: string;
 }
 
@@ -88,7 +88,7 @@ export const SOURCE_LABELS: Record<ReadingSource, string> = {
   pdf: "PDF",
 };
 
-/** 積み上げ・凡例の表示順。 */
+/** Display order for stacking and the legend. */
 export const UTILITY_ORDER: Utility[] = ["electricity", "gas", "water"];
 
 export function utilityMeta(u: Utility): UtilityMeta {
@@ -100,8 +100,8 @@ export function isUtility(v: string): v is Utility {
 }
 
 /**
- * 一般家庭（二人以上世帯）の月あたり平均光熱費の目安（円・概算）。
- * 総務省「家計調査」ベースのおおよその値で、比較用の参考ライン専用。
+ * Rough monthly average utility costs for a typical household of two or more (yen, approximate).
+ * Approximate values based on the Ministry of Internal Affairs and Communications' Family Income and Expenditure Survey (家計調査), used only as reference lines for comparison.
  */
 export const HOUSEHOLD_AVERAGE = {
   electricity: 12000,

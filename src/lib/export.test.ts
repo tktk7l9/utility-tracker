@@ -21,7 +21,7 @@ const rows: Reading[] = [
   {
     id: "2",
     utility: "water",
-    buildingId: "gone", // buildings に存在しない id（フォールバック検証用）
+    buildingId: "gone", // An id not present in buildings (to test the fallback)
     provider: "TokyoWaterworks",
     periodStart: "2025-05-14",
     periodEnd: "2025-07-10",
@@ -56,7 +56,7 @@ describe("toCsv", () => {
     );
   });
   it("未知の buildingId は id にフォールバック。カンマ/引用符/改行はエスケープ、null は空", () => {
-    // usage_value/usage_unit が null → 空セル、note は引用符で囲みつつ " を "" にエスケープ
+    // null usage_value/usage_unit -> empty cells; note is quoted with " escaped as ""
     expect(lines[2]).toBe(
       'water,gone,TokyoWaterworks,2025-05-14,2025-07-10,6146,,,"メモ,に""引用""と\n改行",manual'
     );
@@ -65,7 +65,7 @@ describe("toCsv", () => {
 
 describe("exportFilename", () => {
   it("日付入りのファイル名を作る", () => {
-    const d = new Date(2026, 6, 1); // 2026-07-01（ローカル）
+    const d = new Date(2026, 6, 1); // 2026-07-01 (local time)
     expect(exportFilename("json", d)).toBe("utility-tracker_2026-07-01.json");
     expect(exportFilename("csv", d)).toBe("utility-tracker_2026-07-01.csv");
   });

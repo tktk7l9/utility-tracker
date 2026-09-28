@@ -1,10 +1,10 @@
-// ブラウザで PDF からテキストを抜き出す（PDF.js）。ブラウザ専用の呼び出し層のためカバレッジ計測対象外。
-// 解析は pdfBill.ts の純関数が行う。PDF はどこにも送らず、この端末の中だけで読む。
+// Extracts text from PDFs in the browser (PDF.js). Excluded from coverage as a browser-only call layer.
+// Parsing is done by the pure functions in pdfBill.ts. PDFs are never sent anywhere; they are read only on this device.
 //
-// - PDF.js は通常ワーカーを別ファイルで起動するが、バンドラ（Turbopack）と CSP の都合を避けるため、
-//   ワーカー本体を import して globalThis.pdfjsWorker に置き、メインスレッドで動かす（1ページの請求書なら十分速い）。
-// - エルピオの請求書は日本語フォントを埋め込まず、定義済み CMap（UniJIS-UCS2-H）で文字を表す。
-//   CMap が無いと日本語が1文字も取れないので、public/cmaps（dev/build 前に pdfjs-dist からコピー）から読ませる。
+// - PDF.js normally starts its worker from a separate file, but to avoid bundler (Turbopack) and CSP issues,
+//   we import the worker itself, put it on globalThis.pdfjsWorker and run it on the main thread (fast enough for a one-page bill).
+// - LPIO bills do not embed a Japanese font and encode characters with a predefined CMap (UniJIS-UCS2-H).
+//   Without the CMap not a single Japanese character comes out, so load it from public/cmaps (copied from pdfjs-dist before dev/build).
 
 export async function extractPdfText(data: ArrayBuffer): Promise<string> {
   const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs")]);
