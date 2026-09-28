@@ -1,9 +1,9 @@
-// 認証込みの E2E スモーク: ログイン → INSERT → SELECT → DELETE → ログアウト。
-// パスワードは端末の隠しプロンプトで入力（transcript に残さない）。
+// E2E smoke test including auth: login -> INSERT -> SELECT -> DELETE -> logout.
+// The password is typed at a hidden terminal prompt (so it never lands in a transcript).
 //
 //   node scripts/e2e-supabase-check.mjs you@example.com
 //
-// .env.local の NEXT_PUBLIC_SUPABASE_URL / ANON_KEY を読む。PASS/FAIL のみ出力。
+// Reads NEXT_PUBLIC_SUPABASE_URL / ANON_KEY from .env.local. Prints only PASS/FAIL.
 import { readFileSync } from "node:fs";
 import readline from "node:readline";
 import { createClient } from "@supabase/supabase-js";
@@ -88,8 +88,8 @@ if (ins?.id) {
   const { data: sel, error: selErr } = await supabase.from("readings").select("id,note").eq("id", ins.id).single();
   step("SELECT で読み戻し", !selErr && sel?.id === ins.id, selErr?.message);
 
-  // 同一キーで upsert → 新 unique(user_id,building_id,utility,period_start,period_end) に一致し、
-  // 重複 INSERT でなく UPDATE になることを確認する（bulkUpsert の onConflict と制約の整合）。
+  // Upsert with the same key -> it matches the new unique(user_id,building_id,utility,period_start,period_end)
+  // and becomes an UPDATE rather than a duplicate INSERT (bulkUpsert's onConflict agrees with the constraint).
   const { error: upErr } = await supabase
     .from("readings")
     .upsert({ ...probe, amount_yen: 2 }, { onConflict: "user_id,building_id,utility,period_start,period_end" });

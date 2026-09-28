@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 
 import { UTILITIES } from "@/lib/domain";
 
-// 各社の料金ページ（明細確認・CSVダウンロードの入口）。
+// Each provider's billing page (entry point for checking statements and downloading CSVs).
 const LINKS = [
   { utility: "electricity" as const, label: "電気（TEPCO）", url: "https://epauth.tepco.co.jp/u/login" },
   { utility: "gas" as const, label: "ガス（LPIO）", url: "https://my-lpg.net/customers/login" },

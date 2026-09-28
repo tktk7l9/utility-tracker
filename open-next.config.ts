@@ -1,5 +1,5 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 
-// キャッシュは既定のまま。ISR も on-demand revalidate も使っていない。
+// Caching stays at the defaults. Neither ISR nor on-demand revalidation is used.
 // https://opennext.js.org/cloudflare/caching
 export default defineCloudflareConfig();

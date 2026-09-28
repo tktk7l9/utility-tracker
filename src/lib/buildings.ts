@@ -1,20 +1,20 @@
-// 建物（住まい）まわりの純関数。検針期間と居住期間の重なりから建物を推定し、
-// 手入力・CSV 取込のデフォルト建物選択に使う。すべて副作用なしでテスト容易。
+// Pure functions for buildings (homes). Infers the building from the overlap between reading and residence periods,
+// used as the default building for manual entry and CSV import. All side-effect free and easy to test.
 
 import type { Building } from "./domain";
 
 const DAY_MS = 86_400_000;
 
-/** "YYYY-MM-DD" を UTC ミリ秒に。 */
+/** "YYYY-MM-DD" to UTC milliseconds. */
 function toUTC(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
   return Date.UTC(y, m - 1, d);
 }
 
 /**
- * 検針期間 [periodStart, periodEnd]（両端含む）と建物の居住期間の重なり日数。
- * movedOutOn が null（現住）は periodEnd まで居住しているとみなす。
- * 重なりなし・期間逆転は 0。
+ * Number of days the reading period [periodStart, periodEnd] (inclusive) overlaps the building's residence period.
+ * A null movedOutOn (current home) counts as living there through periodEnd.
+ * No overlap or a reversed period gives 0.
  */
 export function overlapDays(b: Building, periodStart: string, periodEnd: string): number {
   const start = toUTC(periodStart);
@@ -27,8 +27,8 @@ export function overlapDays(b: Building, periodStart: string, periodEnd: string)
 }
 
 /**
- * 検針期間との重なり日数が最大の建物を返す。重なりが1件もなければ null。
- * 同数タイは入居日が新しい方（引っ越し当日をまたぐ期間は新居を優先）。
+ * Returns the building with the most days overlapping the reading period, or null if none overlaps.
+ * Ties go to the later move-in date (a period spanning the move date prefers the new home).
  */
 export function inferBuilding(
   buildings: Building[],
@@ -48,14 +48,14 @@ export function inferBuilding(
   return best;
 }
 
-/** 入居日昇順（同日は name 順）にソートした新配列。セレクタ・管理リストの表示順の正本。 */
+/** New array sorted by move-in date ascending (same day by name). The source of truth for the order in the selector and management list. */
 export function sortBuildings(buildings: Building[]): Building[] {
   return [...buildings].sort(
     (a, b) => a.movedInOn.localeCompare(b.movedInOn) || a.name.localeCompare(b.name)
   );
 }
 
-/** 現住か（退去日が未設定）。 */
+/** Whether this is the current home (no move-out date). */
 export function isCurrentResidence(b: Building): boolean {
   return b.movedOutOn === null;
 }

@@ -1,6 +1,6 @@
-// 可視化の心臓部。すべて純関数（副作用なし・入力→出力が決定的）でユニットテスト容易。
-// 水道は隔月請求のため、各レコードの金額・使用量をカレンダー月へ「日割り按分」して
-// 月次系列に正規化する。これにより積み上げ棒グラフの月合計が正確になる。
+// The heart of the visualizations. All pure functions (no side effects, deterministic input -> output), easy to unit test.
+// Water is billed bimonthly, so each record's amount and usage are prorated by day across calendar months
+// to normalize into a monthly series. This keeps the monthly totals of the stacked bar chart accurate.
 
 import { UTILITY_ORDER, type Reading, type Utility } from "./domain";
 
@@ -8,26 +8,26 @@ const DAY_MS = 86_400_000;
 
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
-/** "YYYY-MM-DD" を UTC ミリ秒に。 */
+/** "YYYY-MM-DD" to UTC milliseconds. */
 function toUTC(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
   return Date.UTC(y, m - 1, d);
 }
 
-/** "YYYY-MM-DD" → "YYYY-MM"。 */
+/** "YYYY-MM-DD" -> "YYYY-MM". */
 export function monthKeyOf(iso: string): string {
   return iso.slice(0, 7);
 }
 
-/** "YYYY-MM" → "2026年6月"。 */
+/** "YYYY-MM" -> "2026年6月". */
 export function monthLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
   return `${y}年${m}月`;
 }
 
 /**
- * 検針期間 [periodStart, periodEnd]（両端含む）が各カレンダー月に何日属するかを返す。
- * end < start（不正）なら空オブジェクト。
+ * Returns how many days of the reading period [periodStart, periodEnd] (inclusive) fall in each calendar month.
+ * Returns an empty object when end < start (invalid).
  */
 export function daysPerMonth(periodStart: string, periodEnd: string): Record<string, number> {
   const start = toUTC(periodStart);
@@ -43,19 +43,19 @@ export function daysPerMonth(periodStart: string, periodEnd: string): Record<str
 }
 
 export interface MonthlyBucket {
-  /** "YYYY-MM"。 */
+  /** "YYYY-MM". */
   month: string;
-  /** 各光熱費の金額（円・日割り按分後）。 */
+  /** Amount per utility (yen, after daily proration). */
   electricity: number;
   gas: number;
   water: number;
-  /** 3社合計金額（円）。 */
+  /** Total amount across the three utilities (yen). */
   total: number;
-  /** 各光熱費の使用量（日割り按分後）。 */
+  /** Usage per utility (after daily proration). */
   usage: Record<Utility, number>;
   /**
-   * データが存在する全光熱費について、この月がカレンダー全体をカバーしているか。
-   * 端の月は部分月（合計が過小）になるため、比較グラフでは trimIncompleteEnds で除ける。
+   * Whether every utility that has data covers this whole calendar month.
+   * Edge months are partial (totals understated), so comparison charts drop them with trimIncompleteEnds.
    */
   complete: boolean;
 }
@@ -72,7 +72,7 @@ function emptyBucket(month: string): MonthlyBucket {
   };
 }
 
-/** 日付区間（UTCミリ秒・両端含む）をソート＋隣接/重複を結合して返す。 */
+/** Sorts date intervals (UTC ms, inclusive) and merges adjacent/overlapping ones. */
 export function mergeIntervals(intervals: Array<[number, number]>): Array<[number, number]> {
   const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
   const out: Array<[number, number]> = [];
@@ -87,7 +87,7 @@ export function mergeIntervals(intervals: Array<[number, number]>): Array<[numbe
   return out;
 }
 
-/** 結合済み区間が "YYYY-MM" の月全体（初日〜末日）を覆っているか。 */
+/** Whether the merged intervals cover the whole "YYYY-MM" month (first to last day). */
 export function monthCovered(coverage: Array<[number, number]>, monthKey: string): boolean {
   const [y, m] = monthKey.split("-").map(Number);
   const first = Date.UTC(y, m - 1, 1);
@@ -95,7 +95,7 @@ export function monthCovered(coverage: Array<[number, number]>, monthKey: string
   return coverage.some(([a, b]) => a <= first && b >= last);
 }
 
-/** 結合済み区間が "YYYY-MM" の月と1日でも重なるか（部分的な接触を含む）。 */
+/** Whether the merged intervals overlap the "YYYY-MM" month by at least one day (partial contact included). */
 export function monthOverlaps(coverage: Array<[number, number]>, monthKey: string): boolean {
   const [y, m] = monthKey.split("-").map(Number);
   const first = Date.UTC(y, m - 1, 1);
@@ -103,20 +103,20 @@ export function monthOverlaps(coverage: Array<[number, number]>, monthKey: strin
   return coverage.some(([a, b]) => a <= last && b >= first);
 }
 
-/** "YYYY-MM-DD" の翌日。 */
+/** The day after "YYYY-MM-DD". */
 function nextDay(iso: string): string {
   const dt = new Date(toUTC(iso) + DAY_MS);
   return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
 }
 
 /**
- * レコード群を月次バケットの昇順配列に集計する。各期間の金額・使用量は日割りで
- * カレンダー月に按分される。
+ * Aggregates records into an ascending array of monthly buckets. Each period's amount and usage
+ * are prorated by day across calendar months.
  */
 export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
   const map = new Map<string, MonthlyBucket>();
-  // 前の期間の終了日と次の期間の開始日が同じ日（エルピオのように検針日で区切る請求書）は、
-  // その日を前の期間にだけ数える。両方に数えると境目の日に2件分が按分され、月の配分が偏る。
+  // When one period's end date equals the next period's start date (bills split on the reading date, like LPIO),
+  // count that day only in the earlier period. Counting it in both prorates two bills onto the boundary day and skews the monthly split.
   const periodEnds = new Set(readings.map((r) => `${r.buildingId}|${r.utility}|${r.periodEnd}`));
 
   for (const r of readings) {
@@ -139,7 +139,7 @@ export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
 
   const sorted = Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
 
-  // 光熱費ごとの検針カバレッジを結合区間として求め、各月の完全性を判定する。
+  // Compute each utility's reading coverage as merged intervals and judge whether each month is complete.
   const coverage = new Map<Utility, Array<[number, number]>>();
   const present = new Set<Utility>();
   for (const r of readings) {
@@ -152,9 +152,9 @@ export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
     else coverage.set(r.utility, [[s, e]]);
   }
   for (const [u, iv] of coverage) coverage.set(u, mergeIntervals(iv));
-  // その月に検針期間が「重なる」光熱費だけ、全体カバーを要求する。
-  // まだ検針が届いていない（＝その月に重ならない）光熱費は not-present 扱いにし、
-  // 更新頻度の違い（例: 電気は毎月／水道は隔月）で直近月が不完全判定→trim される事故を防ぐ。
+  // Require full coverage only from utilities whose reading periods overlap that month.
+  // Utilities with no reading yet (i.e. not overlapping that month) are treated as not-present,
+  // so different billing cycles (e.g. electricity monthly / water bimonthly) do not mark the latest month incomplete and trim it.
   for (const bucket of sorted) {
     bucket.complete = [...present].every((u) => {
       const cov = coverage.get(u)!;
@@ -166,8 +166,8 @@ export function toMonthlySeries(readings: Reading[]): MonthlyBucket[] {
 }
 
 /**
- * 系列の先頭・末尾から「不完全な月」を取り除く（内側は保持）。データ範囲の端で
- * 部分月になり合計が過小に見えるのを防ぐ。比較系グラフ・総評はこれを通す。
+ * Removes incomplete months from the start and end of the series (inner months are kept). Prevents
+ * partial months at the edges of the data from looking understated. Comparison charts and the summary go through this.
  */
 export function trimIncompleteEnds(series: MonthlyBucket[]): MonthlyBucket[] {
   let start = 0;
@@ -177,24 +177,24 @@ export function trimIncompleteEnds(series: MonthlyBucket[]): MonthlyBucket[] {
   return series.slice(start, end);
 }
 
-/** レコードの実効単価（円/単位）。使用量が未入力または 0 なら null。 */
+/** Effective unit price of a record (yen/unit). null when usage is missing or 0. */
 export function unitPrice(r: Reading): number | null {
   if (r.usageValue == null || r.usageValue === 0) return null;
   return r.amountYen / r.usageValue;
 }
 
 export interface UsagePoint {
-  /** 検針期間終了月 "YYYY-MM"。 */
+  /** Month the reading period ends, "YYYY-MM". */
   month: string;
   usage: number | null;
   amount: number;
-  /** 実効単価（円/単位）。 */
+  /** Effective unit price (yen/unit). */
   unitPrice: number | null;
 }
 
 /**
- * 特定の光熱費について、レコード単位（按分しない）の使用量・単価系列を
- * 期間終了月の昇順で返す。単価は按分に馴染まないためレコード実額で算出する。
+ * For one utility, returns the per-record (not prorated) usage and unit price series
+ * in ascending order of period end month. Unit prices do not prorate well, so they use the record's actual amounts.
  */
 export function usageSeriesFor(readings: Reading[], utility: Utility): UsagePoint[] {
   return readings
@@ -209,7 +209,7 @@ export function usageSeriesFor(readings: Reading[], utility: Utility): UsagePoin
     }));
 }
 
-/** 月次バケットから値を取り出す関数の型。 */
+/** Type of a function that extracts a value from a monthly bucket. */
 export type Metric = (b: MonthlyBucket) => number;
 
 export const totalMetric: Metric = (b) => b.total;
@@ -312,13 +312,13 @@ export function refLabelSides(a: number, b: number): ["above" | "below", "above"
 export interface SeasonalPoint {
   monthNum: number;
   label: string;
-  /** 当該月番号における年跨ぎ平均。 */
+  /** Average across years for this month number. */
   average: number;
-  /** 平均に使ったサンプル数。 */
+  /** Number of samples used for the average. */
   count: number;
 }
 
-/** 月番号ごとの平均（季節性）。データの無い月は average=0, count=0。 */
+/** Average per month number (seasonality). Months without data have average=0, count=0. */
 export function seasonalAverages(monthly: MonthlyBucket[], metric: Metric): SeasonalPoint[] {
   const acc = Array.from({ length: 12 }, () => ({ sum: 0, count: 0 }));
   for (const b of monthly) {
@@ -337,28 +337,28 @@ export function seasonalAverages(monthly: MonthlyBucket[], metric: Metric): Seas
 export interface Summary {
   latestMonth: string | null;
   latest: MonthlyBucket | null;
-  /** 前年同月のバケット（無ければ null）。 */
+  /** Bucket for the same month last year (null if none). */
   prevYearSameMonth: MonthlyBucket | null;
-  /** latest.total − 前年同月.total（前年同月が無ければ null）。 */
+  /** latest.total - same month last year's total (null if there is no such month). */
   yoyDelta: number | null;
-  /** yoyDelta / 前年同月.total（前年同月が 0 または無ければ null）。 */
+  /** yoyDelta / same month last year's total (null if that month is 0 or missing). */
   yoyPct: number | null;
 }
 
 export interface PeriodStats {
-  /** 対象月数。 */
+  /** Number of months covered. */
   months: number;
-  /** 期間の合計支出（円）。 */
+  /** Total spending over the period (yen). */
   total: number;
-  /** 月平均支出（円・月数0なら0）。 */
+  /** Average monthly spending (yen; 0 when there are no months). */
   average: number;
-  /** 合計が最大の月。 */
+  /** Month with the highest total. */
   maxMonth: MonthlyBucket | null;
-  /** 合計が最小の月。 */
+  /** Month with the lowest total. */
   minMonth: MonthlyBucket | null;
 }
 
-/** 期間全体の合計・月平均・最高/最低月をまとめる。 */
+/** Summarizes the total, monthly average, and highest/lowest months for the whole period. */
 export function periodStats(monthly: MonthlyBucket[]): PeriodStats {
   if (monthly.length === 0) {
     return { months: 0, total: 0, average: 0, maxMonth: null, minMonth: null };
@@ -376,13 +376,13 @@ export function periodStats(monthly: MonthlyBucket[]): PeriodStats {
 
 export interface UtilityShare {
   utility: Utility;
-  /** 期間の当該光熱費合計（円）。 */
+  /** This utility's total over the period (yen). */
   total: number;
-  /** 総支出に占める割合（0..1・総額0なら0）。 */
+  /** Share of total spending (0..1; 0 when the total is 0). */
   share: number;
 }
 
-/** 光熱費ごとの期間合計と構成比（ドーナツ・凡例用）。 */
+/** Period total and share per utility (for the donut and legend). */
 export function utilityShares(monthly: MonthlyBucket[]): UtilityShare[] {
   const totals: Record<Utility, number> = { electricity: 0, gas: 0, water: 0 };
   let grand = 0;
@@ -393,7 +393,7 @@ export function utilityShares(monthly: MonthlyBucket[]): UtilityShare[] {
   return UTILITY_ORDER.map((u) => ({ utility: u, total: totals[u], share: grand ? totals[u] / grand : 0 }));
 }
 
-/** 直近月の合計と、前年同月比デルタ・増減率を返す。 */
+/** Returns the latest month's total with the year-over-year delta and rate of change. */
 export function summarize(monthly: MonthlyBucket[]): Summary {
   if (monthly.length === 0) {
     return { latestMonth: null, latest: null, prevYearSameMonth: null, yoyDelta: null, yoyPct: null };

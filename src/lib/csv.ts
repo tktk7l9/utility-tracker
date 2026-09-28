@@ -1,6 +1,6 @@
-// CSV取込の純ロジック。パース → 正規化 → NewReading への写像 → 重複除外。
-// TEPCO 想定だが、列マッピングで任意のCSVに対応できる汎用設計。
-// 各社フォーマットが未知でも UI の列マッピングで吸収する。
+// Pure logic for CSV import. Parse -> normalize -> map to NewReading -> drop duplicates.
+// Built with TEPCO in mind, but generic: column mapping handles any CSV.
+// Even unknown provider formats are absorbed by the column mapping in the UI.
 
 import { UTILITIES, type Building, type NewReading, type Utility } from "./domain";
 import { inferBuilding } from "./buildings";
@@ -8,8 +8,8 @@ import { inferBuilding } from "./buildings";
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /**
- * 最小構成のCSVパーサ。ダブルクオート囲み・""エスケープ・CRLF/LF・先頭BOMに対応。
- * 末尾改行は空行を生まない。
+ * Minimal CSV parser. Handles double-quoted fields, "" escapes, CRLF/LF and a leading BOM.
+ * A trailing newline does not produce an empty row.
  */
 export function parseCsv(input: string): string[][] {
   const text = input.replace(/^\uFEFF/, "");
@@ -69,7 +69,7 @@ export function parseCsv(input: string): string[][] {
   return rows;
 }
 
-/** 全角英数記号・全角スペース・各種ハイフンを半角へ。 */
+/** Converts full-width alphanumerics/symbols, full-width spaces and assorted hyphens to half-width. */
 export function toHalfWidth(s: string): string {
   return s
     .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
@@ -79,7 +79,7 @@ export function toHalfWidth(s: string): string {
     .replace(/[－ー―]/g, "-");
 }
 
-/** "¥1,234円" や全角数字を数値に。空・非数値は null。 */
+/** Turns "¥1,234円" or full-width digits into a number. Empty or non-numeric gives null. */
 export function normalizeNumber(raw: string | null | undefined): number | null {
   if (raw == null) return null;
   const s = toHalfWidth(String(raw))
@@ -90,7 +90,7 @@ export function normalizeNumber(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** "5月14日 ～ 7月10日"（東京都水道局）のような1セル内期間の区切り。 */
+/** Separator of a period inside one cell, like "5月14日 ～ 7月10日" (Tokyo Waterworks, 東京都水道局). */
 const RANGE_SEP = /[～〜~]/;
 
 interface DateParts {
@@ -100,8 +100,8 @@ interface DateParts {
 }
 
 /**
- * 1つの日付表記を年・月・日に分解する。年・日は省略可
- * （"5月14日"・"8年 7月分"・"6月" 等の部分表記を許す）。解釈不能なら null。
+ * Splits one date notation into year, month and day. Year and day are optional
+ * (partial forms such as "5月14日", "8年 7月分", "6月" are allowed). null if it cannot be parsed.
  */
 function parseDateParts(raw: string): DateParts | null {
   let s = toHalfWidth(raw).trim();
@@ -125,14 +125,14 @@ function parseDateParts(raw: string): DateParts | null {
     if (hasMonth) return { y: null, m: nums[0], d: nums[1] }; // "5月14日"
     return { y: nums[0], m: nums[1], d: null }; // "2026/06"
   }
-  // 1要素は "6月" のような月のみ表記だけを日付候補として許す（"2026"・"10日" は不可）。
+  // A single element is accepted as a date candidate only when it is month-only like "6月" (not "2026" or "10日").
   if (hasMonth && !hasYear) return { y: null, m: nums[0], d: null };
   return null;
 }
 
 /**
- * 2桁年を西暦2000年代（LPIO「26年06月」= 2026）と令和（東京都水道局「8年 6月」= 令和8年
- * = 2026）の両解釈で比較し、today の年に近い方を採る（同距離なら西暦。令和0年は存在しない）。
+ * Reads a 2-digit year both as 2000s Gregorian (LPIO "26年06月" = 2026) and as Reiwa (Tokyo Waterworks "8年 6月" = Reiwa 8
+ * = 2026) and takes whichever is closer to today's year (Gregorian on a tie; Reiwa 0 does not exist).
  */
 function resolveTwoDigitYear(y: number, todayYear: number): number {
   const west = 2000 + y;
@@ -141,15 +141,15 @@ function resolveTwoDigitYear(y: number, todayYear: number): number {
   return Math.abs(reiwa - todayYear) < Math.abs(west - todayYear) ? reiwa : west;
 }
 
-/** 年月日をレンジ検証つきで "YYYY-MM-DD" にする。範囲外は null。 */
+/** Builds "YYYY-MM-DD" from year/month/day with range checks. null when out of range. */
 function toIso(y: number, m: number, d: number): string | null {
   if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1 || d > 31) return null;
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
 /**
- * "2026/6/1" "2026-06-01" "2026年6月1日" "2026年6月"（日省略=1日）"8年 7月分"（和暦）を
- * "YYYY-MM-DD" へ正規化。"6月 ～ 7月分" のような範囲表記は終端側を採る。解釈不能なら null。
+ * Normalizes "2026/6/1" "2026-06-01" "2026年6月1日" "2026年6月" (day omitted = 1st) "8年 7月分" (Japanese era year) to
+ * "YYYY-MM-DD". For ranges like "6月 ～ 7月分" the end side is used. null if it cannot be parsed.
  */
 export function normalizeDate(raw: string | null | undefined, today: Date = new Date()): string | null {
   if (raw == null) return null;
@@ -161,9 +161,9 @@ export function normalizeDate(raw: string | null | undefined, today: Date = new 
 }
 
 /**
- * "5月14日 ～ 7月10日" のような1セル内の期間表記を {start, end} に分解する。
- * 年が無い側は anchorEnd（期間終了列から得た "YYYY-MM-DD"）の年で補完し、
- * 月が半年超ずれる場合や開始>終了になる場合は年またぎ（12月→1月等）として補正する。
+ * Splits a period inside one cell, like "5月14日 ～ 7月10日", into {start, end}.
+ * A side without a year takes the year of anchorEnd ("YYYY-MM-DD" from the period-end column);
+ * when the months differ by more than half a year or start > end, it is corrected as crossing a year (Dec -> Jan etc.).
  */
 export function normalizeDateRange(
   raw: string | null | undefined,
@@ -203,7 +203,7 @@ export function normalizeDateRange(
   return { start, end };
 }
 
-/** "YYYY-MM-DD" の属する月の初日・末日を返す。 */
+/** Returns the first and last day of the month containing "YYYY-MM-DD". */
 export function monthRange(iso: string): { start: string; end: string } {
   const [y, m] = iso.split("-").map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -211,32 +211,32 @@ export function monthRange(iso: string): { start: string; end: string } {
 }
 
 export interface CsvMapping {
-  /** このCSV全体が対象とする光熱費。 */
+  /** The utility this whole CSV is for. */
   utility: Utility;
-  /** 取込先の建物。省略時は `buildings` から検針期間で行ごとに自動推定。 */
+  /** Target building. When omitted, inferred per row from `buildings` by reading period. */
   buildingId?: string;
-  /** `buildingId` 省略時の推定候補（居住期間で照合）。 */
+  /** Candidates for inference when `buildingId` is omitted (matched by residence period). */
   buildings?: Building[];
-  /** 事業者名（省略時は光熱費の既定値）。 */
+  /** Provider name (defaults to the utility's default). */
   provider?: string;
-  /** 使用量の単位（省略時は光熱費の既定値）。 */
+  /** Usage unit (defaults to the utility's default). */
   usageUnit?: string;
-  /** 1行目をヘッダとして読み飛ばすか。 */
+  /** Whether to skip the first row as a header. */
   hasHeader: boolean;
   columns: {
-    /** 期間開始列（省略時は periodEnd の属する月全体を期間とする）。 */
+    /** Period start column (when omitted, the whole month containing periodEnd is the period). */
     periodStart?: number;
-    /** 期間終了列 or 検針日/請求月の列（必須）。 */
+    /** Period end column, or the reading date / billing month column (required). */
     periodEnd: number;
-    /** 金額列（必須）。 */
+    /** Amount column (required). */
     amount: number;
-    /** 使用量列（任意）。 */
+    /** Usage column (optional). */
     usage?: number;
   };
 }
 
 export interface RowError {
-  /** 0始まりの元行インデックス。 */
+  /** 0-based index of the source row. */
   row: number;
   reason: string;
 }
@@ -246,13 +246,13 @@ export interface MapResult {
   errors: RowError[];
 }
 
-/** 行が全セル空か。 */
+/** Whether every cell in the row is empty. */
 function isBlankRow(cells: string[]): boolean {
-  // trim() は全角スペース(U+3000)も除去するため、空白のみのセルも空とみなせる。
+  // trim() also strips full-width spaces (U+3000), so whitespace-only cells count as empty.
   return cells.every((c) => c.trim() === "");
 }
 
-/** パース済みの行群を、マッピングに従って NewReading[] に変換する。 */
+/** Converts parsed rows into NewReading[] according to the mapping. */
 export function mapRowsToReadings(rows: string[][], mapping: CsvMapping, today: Date = new Date()): MapResult {
   const meta = UTILITIES[mapping.utility];
   const provider = mapping.provider ?? meta.provider;
@@ -284,8 +284,8 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping, today: 
     let periodStart: string;
     let periodEnd: string;
     const startCell = startCol != null ? cells[startCol] : undefined;
-    // 東京都水道局の「使用期間」のような1セル内期間（"5月14日 ～ 7月10日"）は、
-    // 終了列の日付（使用月分等）を年の基準にして開始・終了の両方をここから取る。
+    // For a period inside one cell like Tokyo Waterworks' 「使用期間」 ("5月14日 ～ 7月10日"),
+    // take both start and end from it, using the end column's date (e.g. usage month) as the year anchor.
     const cellRange = startCell != null && RANGE_SEP.test(startCell) ? normalizeDateRange(startCell, endDate, today) : null;
     if (cellRange != null) {
       periodStart = cellRange.start;
@@ -302,14 +302,14 @@ export function mapRowsToReadings(rows: string[][], mapping: CsvMapping, today: 
       }
     }
 
-    // 期間逆転（終了<開始）は集計に寄与しない“死んだ行”になるためエラーに回す。
+    // A reversed period (end < start) would be a "dead row" that never counts in aggregation, so report it as an error.
     if (periodEnd < periodStart) {
       errors.push({ row: rowIndex, reason: "検針期間の終了日が開始日より前です" });
       return;
     }
 
-    // 建物: 固定指定がなければ検針期間と居住期間の重なりから行ごとに推定
-    // （引っ越しをまたぐ CSV も1回の取込で振り分けられる）。
+    // Building: unless fixed, inferred per row from the overlap of reading and residence periods
+    // (so a CSV spanning a move is split in a single import).
     const buildingId =
       mapping.buildingId ?? inferBuilding(mapping.buildings ?? [], periodStart, periodEnd)?.id;
     if (buildingId == null) {
@@ -344,8 +344,8 @@ export interface ColumnGuess {
 }
 
 /**
- * ヘッダ行の列名から列マッピングの初期値を推定する（TEPCO・LPIO・東京都水道局の実CSVを想定）。
- * 同名を含む列が複数あるときは先頭優先。該当なしの項目は null（UI 側で既定値に落とす）。
+ * Infers the initial column mapping from header names (modeled on real TEPCO, LPIO and Tokyo Waterworks CSVs).
+ * When several columns contain the same name, the first wins. Fields with no match are null (the UI falls back to defaults).
  */
 export function guessColumns(header: string[]): ColumnGuess {
   const find = (...patterns: RegExp[]): number | null => {
@@ -363,7 +363,7 @@ export function guessColumns(header: string[]): ColumnGuess {
   };
 }
 
-/** ヘッダの語彙から光熱費種別を推定する。判別できなければ null。 */
+/** Infers the utility type from header vocabulary. null if it cannot tell. */
 export function guessUtility(header: string[]): Utility | null {
   const joined = header.join(" ");
   if (joined.includes("水道")) return "water";
@@ -372,7 +372,7 @@ export function guessUtility(header: string[]): Utility | null {
   return null;
 }
 
-/** 一意キー（同一建物・同一光熱費・同一期間を重複とみなす。DB の一意制約と同じ粒度）。 */
+/** Unique key (same building, utility and period count as duplicates; same granularity as the DB unique constraint). */
 export function readingKey(r: {
   buildingId: string;
   utility: Utility;
@@ -388,8 +388,8 @@ export interface DedupeResult {
 }
 
 /**
- * 取込候補を、既存キー集合＆ファイル内重複に対して振り分ける。
- * 既存キーまたは同一ファイル内で既出のものは duplicates に回す。
+ * Sorts import candidates against the set of existing keys and in-file duplicates.
+ * Anything matching an existing key or already seen in the same file goes to duplicates.
  */
 export function dedupe(incoming: NewReading[], existingKeys: Iterable<string>): DedupeResult {
   const seen = new Set<string>(existingKeys);

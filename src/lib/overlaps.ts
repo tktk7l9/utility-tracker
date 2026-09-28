@@ -1,4 +1,4 @@
-// 取込候補と既存レコードの「検針期間の重なり」を検出する純関数（二重計上の警告用）。
+// Pure functions that detect reading-period overlaps between import candidates and existing records (for double-counting warnings).
 
 import type { NewReading, Reading } from "./domain";
 import { readingKey } from "./csv";
@@ -9,9 +9,9 @@ export interface PeriodOverlap {
 }
 
 /**
- * 同じ建物・同じ光熱費で検針期間が重なる既存レコードを列挙する。
- * 同一期間（readingKey が一致）は重複スキップ／上書きで扱うため除き、
- * 前の期間の終了日と次の期間の開始日が同じ日なだけ（エルピオの検針日区切り）も重なりとみなさない。
+ * Lists existing records of the same building and utility whose reading periods overlap.
+ * Identical periods (matching readingKey) are excluded because duplicate skip/overwrite handles them,
+ * and one period ending on the day the next begins (LPIO's split on the reading date) is not an overlap either.
  */
 export function findPeriodOverlaps(incoming: NewReading[], existing: Reading[]): PeriodOverlap[] {
   const overlaps: PeriodOverlap[] = [];

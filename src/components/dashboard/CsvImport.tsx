@@ -21,7 +21,7 @@ import { ToggleChip } from "@/components/ui/toggle-chip";
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** 読み込んだ PDF 1ファイル分の解析結果。 */
+/** Parse result for one loaded PDF file. */
 interface PdfFileResult {
   name: string;
   bills: ParsedBill[];
@@ -79,7 +79,7 @@ export function CsvImport({
   const [pdfFiles, setPdfFiles] = useState<PdfFileResult[]>([]);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [utility, setUtility] = useState<Utility>("electricity");
-  // CSV の見出しから種別を判別した結果（undefined = 未読込か手で選び直した、null = 判別できなかった）。
+  // Utility type detected from the CSV headers (undefined = not loaded yet or re-picked by hand, null = could not detect).
   const [detectedUtility, setDetectedUtility] = useState<Utility | null | undefined>(undefined);
   const [buildingChoice, setBuildingChoice] = useState(defaultBuildingId ?? "");
   const [hasHeader, setHasHeader] = useState(true);
@@ -94,14 +94,14 @@ export function CsvImport({
 
   const rows = useMemo(() => parseCsv(rawText), [rawText]);
   const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
-  // 建物軸を含むキーなので、重複判定は建物間で混ざらない（全件から生成する）。
+  // The key includes the building, so duplicate detection never mixes buildings (built from all records).
   const existingKeys = useMemo(() => existingReadings.map(readingKey), [existingReadings]);
   const existingSet = useMemo(() => new Set(existingKeys), [existingKeys]);
   const mode: "csv" | "pdf" | null = pdfFiles.length > 0 ? "pdf" : rows.length > 0 ? "csv" : null;
 
   function applyDefaults(parsed: string[][]) {
     const cols = parsed.reduce((m, r) => Math.max(m, r.length), 0);
-    // ヘッダがあれば列名から初期マッピングと種別を推定する（外れても手動で選び直せる）。
+    // When there is a header, infer the initial mapping and type from column names (can be re-picked by hand if wrong).
     const header = hasHeader ? parsed[0] : undefined;
     const guess = header && header.length > 0 ? guessColumns(header) : null;
     setColEnd(guess?.periodEnd ?? 0);
@@ -126,13 +126,13 @@ export function CsvImport({
     if (resetCols) {
       applyDefaults(parseCsv(text));
     } else {
-      // 文字コード切替時は既に設定した列マッピングを保持する（構造は同じ）。
+      // Keep the column mapping already set when switching encoding (the structure is the same).
       setDone(null);
       setError(null);
     }
   }
 
-  /** 請求書 PDF を順に読み取って解析する（読めなかったファイルは理由つきで残す）。 */
+  /** Reads and parses bill PDFs one by one (files that cannot be read are kept with a reason). */
   async function loadPdfs(files: File[]) {
     setLoadingPdf(true);
     try {
@@ -186,7 +186,7 @@ export function CsvImport({
     }
   }
 
-  // 文字コードを切り替えたら、選択済みファイルを列マッピングを保ったまま再デコードする。
+  // When the encoding changes, re-decode the selected file while keeping the column mapping.
   function onEncodingChange(enc: CsvEncoding) {
     setEncoding(enc);
     if (buffer) decodeAndLoad(buffer, enc, false);
@@ -211,7 +211,7 @@ export function CsvImport({
     [rows, utility, buildingChoice, buildings, hasHeader, colEnd, colAmount, colStart, colUsage]
   );
 
-  // PDF は請求書ごとの解析結果を取込候補にする（建物は固定指定がなければ検針期間から推定）。
+  // For PDFs, each bill's parse result becomes an import candidate (the building is inferred from the reading period unless fixed).
   const pdfMapped = useMemo(() => {
     const readings: NewReading[] = [];
     const errors: string[] = [];
@@ -234,10 +234,10 @@ export function CsvImport({
 
   const candidates = mode === "pdf" ? pdfMapped.readings : parsed.readings;
   const errorCount = mode === "pdf" ? pdfMapped.errors.length : parsed.errors.length;
-  // 上書きモードでは既存キーを除外せず、ファイル内重複だけ畳む（bulkUpsert が upsert で上書き）。
+  // In overwrite mode existing keys are not excluded; only in-file duplicates are collapsed (bulkUpsert overwrites via upsert).
   const { toInsert, duplicates } = dedupe(candidates, overwrite ? [] : existingKeys);
   const overwriteCount = overwrite ? toInsert.filter((r) => existingSet.has(readingKey(r))).length : 0;
-  // 同一期間ではないが期間が重なる既存の記録（年月単位の古い記録と検針期間の請求書など）は二重計上になる。
+  // Existing records whose periods overlap without being identical (e.g. old month-based records vs. bills by reading period) would be double-counted.
   const overlaps = findPeriodOverlaps(toInsert, existingReadings);
 
   const headerLabel = (i: number): string => (hasHeader && rows[0]?.[i] ? rows[0][i] : `列${i + 1}`);
@@ -259,7 +259,7 @@ export function CsvImport({
   }
 
   return (
-    // 入力タブでは半幅カードに置かれるため、列数は画面幅ではなくこの要素の幅で決める。
+    // On the input tab this sits in a half-width card, so the column count follows this element's width, not the viewport.
     <div className="@container space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         {mode !== "pdf" && (

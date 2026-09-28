@@ -7,7 +7,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSession, isConfigured, onAuthChange, signOut } from "@/lib/supabase";
 
-/** ヘッダー右上のアカウント表示（ログイン中のみ email ＋ ログアウトを表示）。 */
+/** Account display at the top right of the header (shows email + logout only while signed in). */
 export function AccountControls() {
   const [configured] = useState(() => isConfigured());
   const [session, setSession] = useState<Session | null>(null);

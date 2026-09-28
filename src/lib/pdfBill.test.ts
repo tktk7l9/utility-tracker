@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { detectBillKind, parseBillText } from "./pdfBill";
 
-// PDF.js で抜き出したテキストの形（行の並び・全角記号・「～」）を再現した匿名化フィクスチャ。
-// 氏名・住所・お客さま番号などは架空の値に置き換えている。
+// Anonymized fixtures reproducing the shape of text extracted by PDF.js (line order, full-width symbols, 「～」).
+// Names, addresses, customer numbers and the like are replaced with fictitious values.
 const TEPCO_2026_08 = [
   "更新年月日",
   "山田 太郎 様",
@@ -187,8 +187,8 @@ describe("parseBillText（エルピオ）", () => {
   });
 });
 
-// 東京都水道局の PDF は、埋め込みフォントの ToUnicode が「月・水・用・金・日」などを康熙部首
-// （⽉⽔⽤⾦⽇）で返す。PDF.js の出力どおりにそれを再現している。発行日はダウンロードした日になる。
+// Tokyo Waterworks PDFs have an embedded font whose ToUnicode returns 「月・水・用・金・日」 etc. as Kangxi radicals
+// (⽉⽔⽤⾦⽇). This reproduces PDF.js output as is. The issue date becomes the download date.
 const WATER_2026_07 = [
   "2026年9⽉15⽇",
   "東京都⽔道局⽔道事業会計 T8-8000-2000-0783",

@@ -12,7 +12,7 @@ import { friendlyError } from "@/lib/errors";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [configured] = useState(() => isConfigured());
-  // 未設定なら読み込む対象がないので最初から false。
+  // When not configured there is nothing to load, so start as false.
   const [loading, setLoading] = useState(configured);
   const [session, setSession] = useState<Session | null>(null);
 

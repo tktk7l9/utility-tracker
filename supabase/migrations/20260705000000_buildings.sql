@@ -1,27 +1,27 @@
--- 建物（住まい）ごとの管理を導入する。
+-- Introduces management per building (home).
 --
--- buildings テーブル（名前＋居住期間）を追加し、readings を building_id で
--- 建物スコープ化する。既存レコードはユーザーごとにデフォルト建物
--- 「アルカサーノ永山102（現在）」を作成して backfill する（名前は UI で変更可能）。
+-- Adds the buildings table (name + residence period) and scopes readings
+-- to a building via building_id. Existing records are backfilled by creating a default building
+-- 「アルカサーノ永山102（現在）」 per user (the name can be changed in the UI).
 --
--- 注意: bulkUpsert の onConflict も "user_id,building_id,utility,period_start,period_end"
---       に合わせること（src/lib/supabase.ts）。
+-- Note: bulkUpsert's onConflict must also match "user_id,building_id,utility,period_start,period_end"
+--       (src/lib/supabase.ts).
 
--- 1) buildings テーブル
+-- 1) buildings table
 create table if not exists public.buildings (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
-  moved_in_on  date not null,                 -- 入居日
-  moved_out_on date,                          -- 退去日（null = 現住）
+  moved_in_on  date not null,                 -- move-in date
+  moved_out_on date,                          -- move-out date (null = current home)
   user_id      uuid not null references auth.users(id) default auth.uid(),
   created_at   timestamptz not null default now(),
   constraint buildings_period_check check (moved_out_on is null or moved_out_on >= moved_in_on)
 );
 
--- 新規テーブルは明示 GRANT がないと Data API から見えないことがあるため付与する。
+-- New tables may not be exposed to the Data API without an explicit GRANT, so grant it.
 grant select, insert, update, delete on public.buildings to authenticated;
 
--- 2) RLS（readings と同じ own rows 方針）
+-- 2) RLS (same own-rows policy as readings)
 alter table public.buildings enable row level security;
 drop policy if exists "own rows" on public.buildings;
 create policy "own rows"
@@ -31,12 +31,12 @@ create policy "own rows"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- 3) readings.building_id（レコードが残る建物は削除禁止 = restrict）
+-- 3) readings.building_id (a building that still has records cannot be deleted = restrict)
 alter table public.readings
   add column if not exists building_id uuid references public.buildings(id) on delete restrict;
 
--- 4) backfill: ユーザーごとにデフォルト建物を作成（再実行しても重複しないようガード）。
---    入居日は既存最古の検針開始日（無ければ今日）。後から UI で編集可能。
+-- 4) backfill: create a default building per user (guarded so re-running does not duplicate it).
+--    The move-in date is the oldest existing reading start date (today if none). Editable later in the UI.
 insert into public.buildings (name, moved_in_on, user_id)
 select 'アルカサーノ永山102（現在）',
        coalesce(min(r.period_start), current_date),
@@ -46,7 +46,7 @@ select 'アルカサーノ永山102（現在）',
  where not exists (select 1 from public.buildings b where b.user_id = u.id)
  group by u.id;
 
--- 5) 既存 readings を紐付け → NOT NULL 化
+-- 5) Link existing readings -> make it NOT NULL
 update public.readings r
    set building_id = b.id
   from public.buildings b
@@ -55,17 +55,17 @@ update public.readings r
 
 alter table public.readings alter column building_id set not null;
 
--- 6) 一意制約を建物込みへ差し替え
+-- 6) Replace the unique constraint with one that includes the building
 alter table public.readings drop constraint if exists readings_owner_period_key;
 alter table public.readings drop constraint if exists readings_owner_building_period_key;
 alter table public.readings
   add constraint readings_owner_building_period_key
   unique (user_id, building_id, utility, period_start, period_end);
 
--- 7) 建物フィルタ・FK チェック用インデックス
+-- 7) Index for building filters and FK checks
 create index if not exists readings_building_id_idx on public.readings (building_id);
 
--- 8) 検証（backfill 漏れがないことを NOTICE で確認）
+-- 8) Verify (check via NOTICE that nothing was missed by the backfill)
 do $$
 declare total int; linked int; bcount int;
 begin

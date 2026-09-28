@@ -127,7 +127,7 @@ describe("toMonthlySeries", () => {
       reading({ utility: "gas", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3100, usageValue: 31, usageUnit: "m³" }),
     ]);
     expect(series.map((b) => b.month)).toEqual(["2026-06", "2026-07", "2026-08"]);
-    // 前: 6/4〜7/6 の33日（6月27日・7月6日）。後: 境目の7/6を除いた 7/7〜8/6 の31日（7月25日・8月6日）。
+    // Before: 33 days 6/4-7/6 (27 in June, 6 in July). After: 31 days 7/7-8/6 excluding the boundary day 7/6 (25 in July, 6 in August).
     expect(series[0].gas).toBeCloseTo(2700, 6); // 3300 * 27/33
     expect(series[1].gas).toBeCloseTo(3100, 6); // 3300 * 6/33 + 3100 * 25/31
     expect(series[2].gas).toBeCloseTo(600, 6); // 3100 * 6/31
@@ -141,7 +141,7 @@ describe("toMonthlySeries", () => {
       reading({ utility: "gas", buildingId: "b2", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3200 }),
       reading({ utility: "water", buildingId: "b1", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3200 }),
     ]);
-    // 7/6〜8/6 の32日（7月26日・8月6日）で按分される。
+    // Prorated over the 32 days 7/6-8/6 (26 in July, 6 in August).
     expect(series[2].gas).toBeCloseTo(600, 6); // 3200 * 6/32
     expect(series[2].water).toBeCloseTo(600, 6);
   });
@@ -175,7 +175,7 @@ describe("mergeIntervals", () => {
 });
 
 describe("monthCovered", () => {
-  const cov: Array<[number, number]> = [[Date.UTC(2025, 5, 17), Date.UTC(2025, 7, 18)]]; // 6/17〜8/18
+  const cov: Array<[number, number]> = [[Date.UTC(2025, 5, 17), Date.UTC(2025, 7, 18)]]; // 6/17-8/18
   it("月全体が覆われていれば true", () => {
     expect(monthCovered(cov, "2025-07")).toBe(true);
   });
@@ -189,7 +189,7 @@ describe("monthCovered", () => {
 });
 
 describe("monthOverlaps", () => {
-  const cov: Array<[number, number]> = [[Date.UTC(2026, 2, 1), Date.UTC(2026, 3, 30)]]; // 3/1〜4/30
+  const cov: Array<[number, number]> = [[Date.UTC(2026, 2, 1), Date.UTC(2026, 3, 30)]]; // 3/1-4/30
   it("1日でも重なれば true", () => {
     expect(monthOverlaps(cov, "2026-03")).toBe(true);
     expect(monthOverlaps(cov, "2026-04")).toBe(true);
@@ -220,22 +220,22 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
 
   it("更新頻度の違う光熱費があっても、その月に重ならなければ完全と判定する", () => {
     const readings = [
-      // 電気は毎月フルカバー（5月・6月）。
+      // Electricity fully covers every month (May, June).
       reading({ utility: "electricity", periodStart: "2026-05-01", periodEnd: "2026-05-31", amountYen: 3000, usageValue: 100 }),
       reading({ utility: "electricity", periodStart: "2026-06-01", periodEnd: "2026-06-30", amountYen: 3200, usageValue: 105 }),
-      // 水道は隔月で 3〜4 月まで（5・6 月は未検針）。
+      // Water is bimonthly, up to March-April (May and June not yet read).
       reading({ utility: "water", periodStart: "2026-03-01", periodEnd: "2026-04-30", amountYen: 6000, usageValue: 24, usageUnit: "m³" }),
     ];
     const series = toMonthlySeries(readings);
     const jun = series.find((b) => b.month === "2026-06")!;
-    // 旧ロジックでは water 未カバーで false → 直近月が trim されて消えていた。
+    // The old logic returned false because water was not covered -> the latest month was trimmed away.
     expect(jun.complete).toBe(true);
     expect(series.every((b) => b.complete)).toBe(true);
     expect(trimIncompleteEnds(series).some((b) => b.month === "2026-06")).toBe(true);
   });
 
   it("端の部分月は、その光熱費が月に重なりつつ覆いきれないので incomplete のまま", () => {
-    // 電気が月途中から開始 → その月は重なるが全体は覆えず incomplete。
+    // Electricity starts mid-month -> it overlaps that month but does not cover it, so incomplete.
     const series = toMonthlySeries([
       reading({ utility: "electricity", periodStart: "2026-06-15", periodEnd: "2026-07-31", amountYen: 3000, usageValue: 100 }),
     ]);
@@ -251,7 +251,7 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
   });
 
   it("「すべて（合算）」ビュー: 建物をまたいでも金額・使用量は単純加算され、引っ越し月の重複期間は complete を壊さない", () => {
-    // 6/1〜6/14 旧居、6/15〜6/30 新居（引っ越し当日で連続・重複なし）に分かれた検針。
+    // Readings split into 6/1-6/14 at the old home and 6/15-6/30 at the new one (contiguous at the move date, no overlap).
     const series = toMonthlySeries([
       reading({ buildingId: "old", periodStart: "2026-06-01", periodEnd: "2026-06-14", amountYen: 1000, usageValue: 40 }),
       reading({ buildingId: "new", periodStart: "2026-06-15", periodEnd: "2026-06-30", amountYen: 1200, usageValue: 60 }),
@@ -259,7 +259,7 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
     const jun = series.find((b) => b.month === "2026-06")!;
     expect(jun.electricity).toBe(2200); // 1000 + 1200
     expect(jun.usage.electricity).toBe(100); // 40 + 60
-    expect(jun.complete).toBe(true); // mergeIntervals が連続区間として結合し月全体をカバー
+    expect(jun.complete).toBe(true); // mergeIntervals joins them as one contiguous interval covering the whole month
   });
 });
 
@@ -286,7 +286,7 @@ describe("usageSeriesFor", () => {
     const points = usageSeriesFor(readings, "electricity");
     expect(points.map((p) => p.month)).toEqual(["2026-05", "2026-05", "2026-07"]);
     expect(points[2].unitPrice).toBe(40);
-    // usage null のレコードは単価 null
+    // A record with null usage has a null unit price
     expect(points.some((p) => p.unitPrice === null)).toBe(true);
   });
 });
