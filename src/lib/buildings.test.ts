@@ -10,32 +10,32 @@ const mk = (id: string, name: string, movedInOn: string, movedOutOn: string | nu
 });
 
 describe("overlapDays", () => {
-  it("検針期間が居住期間に完全包含されるなら期間全日", () => {
+  it("counts every day of the period when the reading period lies fully inside the residence", () => {
     const b = mk("a", "A", "2026-01-01", "2026-12-31");
     expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(30);
   });
 
-  it("部分的な重なりは重なった日数のみ", () => {
+  it("counts only the overlapping days for a partial overlap", () => {
     const b = mk("a", "A", "2026-06-15", "2026-12-31");
     expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(16); // 6/15-6/30
   });
 
-  it("重なりなしは 0", () => {
+  it("returns 0 when there is no overlap", () => {
     const b = mk("a", "A", "2025-01-01", "2025-12-31");
     expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(0);
   });
 
-  it("境界日（入居日=期間終了日 / 退去日=期間開始日）は 1 日", () => {
+  it("counts 1 day on the boundary (move-in = period end / move-out = period start)", () => {
     expect(overlapDays(mk("a", "A", "2026-06-30", null), "2026-06-01", "2026-06-30")).toBe(1);
     expect(overlapDays(mk("a", "A", "2026-01-01", "2026-06-01"), "2026-06-01", "2026-06-30")).toBe(1);
   });
 
-  it("退去日 null（現住）は期間終了日まで居住とみなす", () => {
+  it("treats a null move-out date (current home) as living there until the period end", () => {
     const b = mk("a", "A", "2026-06-10", null);
     expect(overlapDays(b, "2026-06-01", "2026-06-30")).toBe(21); // 6/10-6/30
   });
 
-  it("期間逆転（終了<開始）は 0", () => {
+  it("returns 0 for a reversed period (end < start)", () => {
     const b = mk("a", "A", "2026-01-01", null);
     expect(overlapDays(b, "2026-06-30", "2026-06-01")).toBe(0);
   });
@@ -45,22 +45,22 @@ describe("inferBuilding", () => {
   const oldHome = mk("old", "旧居", "2025-01-01", "2026-06-14");
   const newHome = mk("new", "新居", "2026-06-15", null);
 
-  it("建物なしは null", () => {
+  it("returns null when there are no buildings", () => {
     expect(inferBuilding([], "2026-06-01", "2026-06-30")).toBeNull();
   });
 
-  it("どの居住期間とも重ならなければ null", () => {
+  it("returns null when no residence period overlaps", () => {
     expect(inferBuilding([oldHome], "2024-01-01", "2024-01-31")).toBeNull();
   });
 
-  it("重なり日数が最大の建物を返す（引っ越しまたぎの検針期間）", () => {
+  it("returns the building with the most overlapping days (reading period spanning a move)", () => {
     // 6/1-6/30: 14 days at the old home, 16 at the new one -> new home
     expect(inferBuilding([oldHome, newHome], "2026-06-01", "2026-06-30")?.id).toBe("new");
     // Same result with the array reversed (the smaller overlap never overwrites the maximum)
     expect(inferBuilding([newHome, oldHome], "2026-06-01", "2026-06-30")?.id).toBe("new");
   });
 
-  it("重なり同数のタイは入居日が新しい方（引っ越し当日は新居優先）", () => {
+  it("breaks a tie by the newer move-in date (the new home wins on moving day)", () => {
     // 6/14-6/15: 1 day at the old home (6/14), 1 day at the new one (6/15)
     expect(inferBuilding([oldHome, newHome], "2026-06-14", "2026-06-15")?.id).toBe("new");
     expect(inferBuilding([newHome, oldHome], "2026-06-14", "2026-06-15")?.id).toBe("new");
@@ -68,7 +68,7 @@ describe("inferBuilding", () => {
 });
 
 describe("sortBuildings", () => {
-  it("入居日昇順（同日は name 順）で、元配列を破壊しない", () => {
+  it("sorts by move-in date ascending (name on the same day) without mutating the input", () => {
     const a = mk("a", "い", "2026-06-15");
     const b = mk("b", "あ", "2025-01-01");
     const c = mk("c", "あ", "2026-06-15");
@@ -79,7 +79,7 @@ describe("sortBuildings", () => {
 });
 
 describe("isCurrentResidence", () => {
-  it("退去日 null は現住、日付ありは非現住", () => {
+  it("treats a null move-out date as current and a dated one as not current", () => {
     expect(isCurrentResidence(mk("a", "A", "2026-01-01", null))).toBe(true);
     expect(isCurrentResidence(mk("a", "A", "2026-01-01", "2026-06-30"))).toBe(false);
   });

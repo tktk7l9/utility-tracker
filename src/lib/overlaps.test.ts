@@ -34,31 +34,31 @@ function incoming(p: Partial<NewReading>): NewReading {
 }
 
 describe("findPeriodOverlaps", () => {
-  it("同じ建物・光熱費で期間が重なる既存レコードを返す（年月単位の記録と検針期間の請求書）", () => {
+  it("returns existing records of the same building and utility whose period overlaps (monthly record vs. reading-period bill)", () => {
     const ex = existing({ periodStart: "2026-06-01", periodEnd: "2026-06-30" });
     const inc = incoming({ periodStart: "2026-06-04", periodEnd: "2026-07-06" });
     expect(findPeriodOverlaps([inc], [ex])).toEqual([{ incoming: inc, existing: ex }]);
   });
 
-  it("建物か光熱費が違えば重なりとみなさない", () => {
+  it("does not treat a different building or utility as an overlap", () => {
     const inc = incoming({});
     expect(findPeriodOverlaps([inc], [existing({ buildingId: "b2" })])).toEqual([]);
     expect(findPeriodOverlaps([inc], [existing({ utility: "water" })])).toEqual([]);
   });
 
-  it("同一期間は重複（スキップ／上書き）として扱い、重なりには含めない", () => {
+  it("treats an identical period as a duplicate (skip/overwrite), not an overlap", () => {
     const inc = incoming({ periodStart: "2026-06-04", periodEnd: "2026-07-06" });
     expect(findPeriodOverlaps([inc], [existing({ periodStart: "2026-06-04", periodEnd: "2026-07-06" })])).toEqual([]);
   });
 
-  it("前の期間の終了日と次の期間の開始日が同じ日なだけなら重ならない", () => {
+  it("does not overlap when one period ends on the day the next begins", () => {
     const earlier = { periodStart: "2026-06-04", periodEnd: "2026-07-06" };
     const later = { periodStart: "2026-07-06", periodEnd: "2026-08-06" };
     expect(findPeriodOverlaps([incoming(later)], [existing(earlier)])).toEqual([]);
     expect(findPeriodOverlaps([incoming(earlier)], [existing(later)])).toEqual([]);
   });
 
-  it("離れた期間は重ならない", () => {
+  it("does not overlap for separate periods", () => {
     const june = { periodStart: "2026-06-01", periodEnd: "2026-06-30" };
     const august = { periodStart: "2026-08-01", periodEnd: "2026-08-31" };
     expect(findPeriodOverlaps([incoming(august)], [existing(june)])).toEqual([]);

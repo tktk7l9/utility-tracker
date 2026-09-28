@@ -2,22 +2,22 @@ import { describe, it, expect } from "vitest";
 import { UTILITIES, UTILITY_ORDER, utilityMeta, isUtility, SOURCE_LABELS } from "./domain";
 
 describe("domain", () => {
-  it("UTILITIES に3社が定義され既定値を持つ", () => {
+  it("defines three utilities in UTILITIES, each with defaults", () => {
     expect(UTILITIES.electricity.unit).toBe("kWh");
     expect(UTILITIES.gas.provider).toBe("LPIO");
     expect(UTILITIES.water.provider).toBe("TokyoWaterworks");
     expect(UTILITIES.water.label).toBe("水道");
   });
 
-  it("UTILITY_ORDER は電気→ガス→水道", () => {
+  it("orders UTILITY_ORDER as electricity, gas, water", () => {
     expect(UTILITY_ORDER).toEqual(["electricity", "gas", "water"]);
   });
 
-  it("utilityMeta はキーに対応するメタを返す", () => {
+  it("utilityMeta returns the meta for the key", () => {
     expect(utilityMeta("gas").color).toBe(UTILITIES.gas.color);
   });
 
-  it("isUtility は3種のみ true", () => {
+  it("isUtility is true only for the three kinds", () => {
     expect(isUtility("electricity")).toBe(true);
     expect(isUtility("gas")).toBe(true);
     expect(isUtility("water")).toBe(true);

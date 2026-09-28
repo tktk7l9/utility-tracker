@@ -34,7 +34,7 @@ const rows: Reading[] = [
 ];
 
 describe("toExportJson", () => {
-  it("buildings + readings 形状で往復できる", () => {
+  it("round-trips in the buildings + readings shape", () => {
     const json = toExportJson(rows, buildings);
     expect(json).toContain("\n"); // pretty print
     expect(JSON.parse(json)).toEqual({ buildings, readings: rows });
@@ -45,17 +45,17 @@ describe("toCsv", () => {
   const csv = toCsv(rows, buildings);
   const lines = csv.split("\r\n");
 
-  it("ヘッダ行を持つ", () => {
+  it("has a header row", () => {
     expect(lines[0]).toBe(
       "utility,building,provider,period_start,period_end,amount_yen,usage_value,usage_unit,note,source"
     );
   });
-  it("通常行は建物名を解決", () => {
+  it("resolves the building name for normal rows", () => {
     expect(lines[1]).toBe(
       "electricity,アルカサーノ永山102（現在）,TEPCO,2025-06-17,2025-07-16,23837,663,kWh,,csv"
     );
   });
-  it("未知の buildingId は id にフォールバック。カンマ/引用符/改行はエスケープ、null は空", () => {
+  it("falls back to the id for an unknown buildingId; escapes commas/quotes/newlines and leaves null empty", () => {
     // null usage_value/usage_unit -> empty cells; note is quoted with " escaped as ""
     expect(lines[2]).toBe(
       'water,gone,TokyoWaterworks,2025-05-14,2025-07-10,6146,,,"メモ,に""引用""と\n改行",manual'
@@ -64,7 +64,7 @@ describe("toCsv", () => {
 });
 
 describe("exportFilename", () => {
-  it("日付入りのファイル名を作る", () => {
+  it("builds a file name with the date", () => {
     const d = new Date(2026, 6, 1); // 2026-07-01 (local time)
     expect(exportFilename("json", d)).toBe("utility-tracker_2026-07-01.json");
     expect(exportFilename("csv", d)).toBe("utility-tracker_2026-07-01.csv");

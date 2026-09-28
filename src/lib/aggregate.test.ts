@@ -52,32 +52,32 @@ function bucket(month: string, total: number, parts?: Partial<MonthlyBucket>): M
 }
 
 describe("date helpers", () => {
-  it("monthKeyOf は YYYY-MM を取り出す", () => {
+  it("monthKeyOf extracts YYYY-MM", () => {
     expect(monthKeyOf("2026-06-19")).toBe("2026-06");
   });
-  it("monthLabel は和暦風の表示にする", () => {
+  it("monthLabel uses the Japanese-style label", () => {
     expect(monthLabel("2026-06")).toBe("2026年6月");
   });
 });
 
 describe("daysPerMonth", () => {
-  it("単一月は日数をそのまま返す", () => {
+  it("returns the day count as is for a single month", () => {
     expect(daysPerMonth("2026-06-01", "2026-06-30")).toEqual({ "2026-06": 30 });
   });
-  it("月をまたぐと按分用の日数に割れる", () => {
+  it("splits into per-month day counts for proration across months", () => {
     expect(daysPerMonth("2026-05-20", "2026-06-19")).toEqual({ "2026-05": 12, "2026-06": 19 });
   });
-  it("終了日が開始日より前なら空", () => {
+  it("returns empty when the end date is before the start date", () => {
     expect(daysPerMonth("2026-07-10", "2026-07-01")).toEqual({});
   });
 });
 
 describe("toMonthlySeries", () => {
-  it("空配列は空系列", () => {
+  it("returns an empty series for an empty array", () => {
     expect(toMonthlySeries([])).toEqual([]);
   });
 
-  it("単一月レコードは按分なしで満額計上", () => {
+  it("books a single-month record in full without proration", () => {
     const series = toMonthlySeries([reading({ amountYen: 3000, usageValue: 100 })]);
     expect(series).toHaveLength(1);
     expect(series[0].month).toBe("2026-06");
@@ -86,7 +86,7 @@ describe("toMonthlySeries", () => {
     expect(series[0].usage.electricity).toBe(100);
   });
 
-  it("隔月レコードを日割りで各月に按分し、月ごとに合算する", () => {
+  it("prorates bimonthly records by day and sums per month", () => {
     const series = toMonthlySeries([
       reading({ utility: "electricity", periodStart: "2026-06-01", periodEnd: "2026-06-30", amountYen: 3000, usageValue: 100 }),
       reading({ utility: "water", periodStart: "2026-05-20", periodEnd: "2026-06-19", amountYen: 6200, usageValue: 24, usageUnit: "m³" }),
@@ -106,7 +106,7 @@ describe("toMonthlySeries", () => {
     expect(jun.usage.electricity).toBe(100);
   });
 
-  it("使用量 null は金額だけ計上し使用量は 0 のまま", () => {
+  it("books only the amount when usage is null and keeps usage at 0", () => {
     const series = toMonthlySeries([
       reading({ periodStart: "2026-08-01", periodEnd: "2026-08-31", amountYen: 2000, usageValue: null }),
     ]);
@@ -114,14 +114,14 @@ describe("toMonthlySeries", () => {
     expect(series[0].usage.electricity).toBe(0);
   });
 
-  it("不正な期間（終了<開始）のレコードは無視する", () => {
+  it("ignores records with an invalid period (end < start)", () => {
     const series = toMonthlySeries([
       reading({ utility: "gas", periodStart: "2026-07-10", periodEnd: "2026-07-01", amountYen: 1000, usageValue: 5 }),
     ]);
     expect(series).toEqual([]);
   });
 
-  it("前の期間の終了日と次の期間の開始日が同じ日なら、その日は前の期間にだけ数える（金額は保存される）", () => {
+  it("counts a shared boundary day only in the earlier period (the amount is preserved)", () => {
     const series = toMonthlySeries([
       reading({ utility: "gas", periodStart: "2026-06-04", periodEnd: "2026-07-06", amountYen: 3300, usageValue: 33, usageUnit: "m³" }),
       reading({ utility: "gas", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3100, usageValue: 31, usageUnit: "m³" }),
@@ -135,7 +135,7 @@ describe("toMonthlySeries", () => {
     expect(series.reduce((sum, b) => sum + b.gas, 0)).toBeCloseTo(6400, 6);
   });
 
-  it("境目が同じ日でも建物か光熱費が違えば、それぞれの期間をそのまま数える", () => {
+  it("counts each period as is when the boundary day is shared but the building or utility differs", () => {
     const series = toMonthlySeries([
       reading({ utility: "gas", buildingId: "b1", periodStart: "2026-06-04", periodEnd: "2026-07-06", amountYen: 3300 }),
       reading({ utility: "gas", buildingId: "b2", periodStart: "2026-07-06", periodEnd: "2026-08-06", amountYen: 3200 }),
@@ -146,7 +146,7 @@ describe("toMonthlySeries", () => {
     expect(series[2].water).toBeCloseTo(600, 6);
   });
 
-  it("1日だけの期間は境目が同じ日でも除かない（金額が消えないように）", () => {
+  it("keeps a one-day period even on a shared boundary (so its amount is not lost)", () => {
     const series = toMonthlySeries([
       reading({ utility: "gas", periodStart: "2026-07-01", periodEnd: "2026-07-06", amountYen: 600 }),
       reading({ utility: "gas", periodStart: "2026-07-06", periodEnd: "2026-07-06", amountYen: 100 }),
@@ -157,54 +157,54 @@ describe("toMonthlySeries", () => {
 
 describe("mergeIntervals", () => {
   const D = 86_400_000;
-  it("空は空", () => {
+  it("returns empty for empty", () => {
     expect(mergeIntervals([])).toEqual([]);
   });
-  it("単一はそのまま", () => {
+  it("returns a single interval as is", () => {
     expect(mergeIntervals([[0, 10]])).toEqual([[0, 10]]);
   });
-  it("未ソート＋重複を結合", () => {
+  it("merges unsorted and overlapping intervals", () => {
     expect(mergeIntervals([[5, 15], [0, 10]])).toEqual([[0, 15]]);
   });
-  it("隣接（1日差）は結合", () => {
+  it("merges adjacent intervals (1-day gap)", () => {
     expect(mergeIntervals([[0, D], [2 * D, 3 * D]])).toEqual([[0, 3 * D]]);
   });
-  it("間隔が空くと分離", () => {
+  it("keeps intervals apart when there is a gap", () => {
     expect(mergeIntervals([[0, D], [3 * D, 4 * D]])).toEqual([[0, D], [3 * D, 4 * D]]);
   });
 });
 
 describe("monthCovered", () => {
   const cov: Array<[number, number]> = [[Date.UTC(2025, 5, 17), Date.UTC(2025, 7, 18)]]; // 6/17-8/18
-  it("月全体が覆われていれば true", () => {
+  it("is true when the whole month is covered", () => {
     expect(monthCovered(cov, "2025-07")).toBe(true);
   });
-  it("部分月は false", () => {
+  it("is false for a partial month", () => {
     expect(monthCovered(cov, "2025-06")).toBe(false);
     expect(monthCovered(cov, "2025-08")).toBe(false);
   });
-  it("カバレッジ空は false", () => {
+  it("is false for empty coverage", () => {
     expect(monthCovered([], "2025-07")).toBe(false);
   });
 });
 
 describe("monthOverlaps", () => {
   const cov: Array<[number, number]> = [[Date.UTC(2026, 2, 1), Date.UTC(2026, 3, 30)]]; // 3/1-4/30
-  it("1日でも重なれば true", () => {
+  it("is true when even one day overlaps", () => {
     expect(monthOverlaps(cov, "2026-03")).toBe(true);
     expect(monthOverlaps(cov, "2026-04")).toBe(true);
   });
-  it("重ならない月は false", () => {
+  it("is false for a month with no overlap", () => {
     expect(monthOverlaps(cov, "2026-02")).toBe(false);
     expect(monthOverlaps(cov, "2026-05")).toBe(false);
   });
-  it("カバレッジ空は false", () => {
+  it("is false for empty coverage", () => {
     expect(monthOverlaps([], "2026-03")).toBe(false);
   });
 });
 
-describe("完全性 (complete) と trimIncompleteEnds", () => {
-  it("端の部分月を incomplete、内側を complete に判定する", () => {
+describe("completeness (complete) and trimIncompleteEnds", () => {
+  it("marks partial months at the ends incomplete and inner months complete", () => {
     const readings = [
       reading({ utility: "electricity", periodStart: "2025-06-17", periodEnd: "2025-07-16", amountYen: 1000, usageValue: 100 }),
       reading({ utility: "electricity", periodStart: "2025-07-17", periodEnd: "2025-08-18", amountYen: 1000, usageValue: 100 }),
@@ -218,7 +218,7 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
     expect(trimIncompleteEnds(series).map((b) => b.month)).toEqual(["2025-07"]);
   });
 
-  it("更新頻度の違う光熱費があっても、その月に重ならなければ完全と判定する", () => {
+  it("treats a month as complete when a utility with a different cadence does not touch it", () => {
     const readings = [
       // Electricity fully covers every month (May, June).
       reading({ utility: "electricity", periodStart: "2026-05-01", periodEnd: "2026-05-31", amountYen: 3000, usageValue: 100 }),
@@ -234,7 +234,7 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
     expect(trimIncompleteEnds(series).some((b) => b.month === "2026-06")).toBe(true);
   });
 
-  it("端の部分月は、その光熱費が月に重なりつつ覆いきれないので incomplete のまま", () => {
+  it("keeps a partial end month incomplete when that utility touches but does not cover it", () => {
     // Electricity starts mid-month -> it overlaps that month but does not cover it, so incomplete.
     const series = toMonthlySeries([
       reading({ utility: "electricity", periodStart: "2026-06-15", periodEnd: "2026-07-31", amountYen: 3000, usageValue: 100 }),
@@ -243,14 +243,14 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
     expect(series.find((b) => b.month === "2026-07")!.complete).toBe(true);
   });
 
-  it("全て complete ならトリムしない・空はそのまま", () => {
+  it("does not trim when all are complete; leaves empty as is", () => {
     const full = toMonthlySeries([reading({ periodStart: "2025-07-01", periodEnd: "2025-07-31" })]);
     expect(full[0].complete).toBe(true);
     expect(trimIncompleteEnds(full)).toHaveLength(1);
     expect(trimIncompleteEnds([])).toEqual([]);
   });
 
-  it("「すべて（合算）」ビュー: 建物をまたいでも金額・使用量は単純加算され、引っ越し月の重複期間は complete を壊さない", () => {
+  it("\"all (combined)\" view: sums amounts and usage across buildings, and a move-month overlap does not break complete", () => {
     // Readings split into 6/1-6/14 at the old home and 6/15-6/30 at the new one (contiguous at the move date, no overlap).
     const series = toMonthlySeries([
       reading({ buildingId: "old", periodStart: "2026-06-01", periodEnd: "2026-06-14", amountYen: 1000, usageValue: 40 }),
@@ -264,19 +264,19 @@ describe("完全性 (complete) と trimIncompleteEnds", () => {
 });
 
 describe("unitPrice", () => {
-  it("金額÷使用量", () => {
+  it("divides amount by usage", () => {
     expect(unitPrice(reading({ amountYen: 3000, usageValue: 100 }))).toBe(30);
   });
-  it("使用量 null は null", () => {
+  it("returns null when usage is null", () => {
     expect(unitPrice(reading({ usageValue: null }))).toBeNull();
   });
-  it("使用量 0 は null（ゼロ割回避）", () => {
+  it("returns null when usage is 0 (avoids division by zero)", () => {
     expect(unitPrice(reading({ usageValue: 0 }))).toBeNull();
   });
 });
 
 describe("usageSeriesFor", () => {
-  it("対象光熱費のみ・期間終了月の昇順・単価付き", () => {
+  it("only the target utility, sorted by period-end month, with unit prices", () => {
     const readings = [
       reading({ utility: "gas", periodEnd: "2026-06-30", amountYen: 5000, usageValue: 20 }),
       reading({ utility: "electricity", periodEnd: "2026-07-31", amountYen: 4000, usageValue: 100 }),
@@ -389,7 +389,7 @@ describe("refLabelSides", () => {
 });
 
 describe("seasonalAverages", () => {
-  it("月番号ごとの年跨ぎ平均（データ無しは 0）", () => {
+  it("averages each month number across years (0 when no data)", () => {
     const monthly = [bucket("2025-06", 5000), bucket("2026-06", 6000), bucket("2026-07", 3000)];
     const seasonal = seasonalAverages(monthly, totalMetric);
     expect(seasonal[5]).toMatchObject({ monthNum: 6, average: 5500, count: 2 });
@@ -399,10 +399,10 @@ describe("seasonalAverages", () => {
 });
 
 describe("periodStats", () => {
-  it("空はゼロ・null", () => {
+  it("returns zeros and nulls for empty", () => {
     expect(periodStats([])).toEqual({ months: 0, total: 0, average: 0, maxMonth: null, minMonth: null });
   });
-  it("合計・月平均・最高/最低月を求める", () => {
+  it("computes total, monthly average and highest/lowest months", () => {
     const monthly = [bucket("2025-06", 5000), bucket("2025-07", 3000), bucket("2025-08", 8000)];
     const s = periodStats(monthly);
     expect(s.months).toBe(3);
@@ -414,7 +414,7 @@ describe("periodStats", () => {
 });
 
 describe("utilityShares", () => {
-  it("光熱費別の合計と構成比（総額0は share 0）", () => {
+  it("computes per-utility totals and shares (share 0 when the total is 0)", () => {
     expect(utilityShares([]).every((x) => x.total === 0 && x.share === 0)).toBe(true);
     const shares = utilityShares([bucket("2026-06", 10000, { electricity: 6000, gas: 3000, water: 1000 })]);
     expect(shares).toEqual([
@@ -426,7 +426,7 @@ describe("utilityShares", () => {
 });
 
 describe("summarize", () => {
-  it("空は全て null", () => {
+  it("returns all nulls for empty", () => {
     expect(summarize([])).toEqual({
       latestMonth: null,
       latest: null,
@@ -436,20 +436,20 @@ describe("summarize", () => {
     });
   });
 
-  it("前年同月があればデルタと増減率を出す", () => {
+  it("gives the delta and rate when the same month last year exists", () => {
     const s = summarize([bucket("2025-06", 5000), bucket("2026-06", 6000)]);
     expect(s.latestMonth).toBe("2026-06");
     expect(s.yoyDelta).toBe(1000);
     expect(s.yoyPct).toBeCloseTo(0.2, 6);
   });
 
-  it("前年同月が 0 円なら増減率は null（デルタは算出）", () => {
+  it("leaves the rate null when last year's month was 0 yen (delta still computed)", () => {
     const s = summarize([bucket("2025-06", 0), bucket("2026-06", 6000)]);
     expect(s.yoyDelta).toBe(6000);
     expect(s.yoyPct).toBeNull();
   });
 
-  it("前年同月が無ければデルタ・増減率とも null", () => {
+  it("leaves delta and rate null when there is no same month last year", () => {
     const s = summarize([bucket("2026-06", 6000)]);
     expect(s.yoyDelta).toBeNull();
     expect(s.yoyPct).toBeNull();
