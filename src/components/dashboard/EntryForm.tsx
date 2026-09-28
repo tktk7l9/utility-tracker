@@ -10,6 +10,7 @@ import { inferBuilding } from "@/lib/buildings";
 import { parseLenientNumber } from "@/lib/number";
 import { suggestPeriod } from "@/lib/period";
 import { friendlyError } from "@/lib/errors";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -109,19 +110,9 @@ export function EntryForm({
         <Label>種別</Label>
         <div className="flex gap-1.5">
           {UTILITY_ORDER.map((u) => (
-            <button
-              key={u}
-              type="button"
-              onClick={() => chooseUtility(u)}
-              aria-pressed={u === utility}
-              className={
-                "rounded-md border px-3 py-1.5 text-sm transition-colors " +
-                (u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent")
-              }
-              style={u === utility ? { backgroundColor: UTILITIES[u].color } : undefined}
-            >
+            <ToggleChip key={u} pressed={u === utility} color={UTILITIES[u].color} onClick={() => chooseUtility(u)}>
               {UTILITIES[u].label}
-            </button>
+            </ToggleChip>
           ))}
         </div>
       </div>

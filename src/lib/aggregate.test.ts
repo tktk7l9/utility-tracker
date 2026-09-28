@@ -11,7 +11,9 @@ import {
   monthOverlaps,
   unitPrice,
   usageSeriesFor,
-  yoyByMonth,
+  yearOverYear,
+  refLabelSides,
+  yoyTotals,
   seasonalAverages,
   summarize,
   periodStats,
@@ -289,24 +291,100 @@ describe("usageSeriesFor", () => {
   });
 });
 
-describe("yoyByMonth", () => {
-  const monthly = [bucket("2025-06", 5000), bucket("2026-06", 6000), bucket("2026-07", 3000)];
+describe("yearOverYear", () => {
+  const monthly = [
+    bucket("2024-06", 4000),
+    bucket("2025-06", 5000),
+    bucket("2025-07", 2000),
+    bucket("2026-06", 6000),
+    bucket("2026-07", 3000),
+  ];
 
-  it("月番号×年のテーブルを作る（total）", () => {
-    const table = yoyByMonth(monthly, totalMetric);
-    expect(table.years).toEqual(["2025", "2026"]);
-    expect(table.rows).toHaveLength(12);
-    const june = table.rows[5];
-    expect(june).toMatchObject({ monthNum: 6, label: "6月", "2025": 5000, "2026": 6000 });
-    const july = table.rows[6];
-    expect(july).toMatchObject({ "2025": 0, "2026": 3000 });
-    // データの無い月は 0
-    expect(table.rows[0]["2026"]).toBe(0);
+  it("compares the latest year with the year before by default", () => {
+    const t = yearOverYear(monthly, totalMetric);
+    expect(t.years).toEqual(["2024", "2025", "2026"]);
+    expect(t.current).toBe("2026");
+    expect(t.previous).toBe("2025");
+    expect(t.rows).toHaveLength(12);
+    expect(t.rows[5]).toEqual({
+      monthNum: 6,
+      label: "6月",
+      current: 6000,
+      previous: 5000,
+      delta: 1000,
+      deltaPct: 0.2,
+    });
   });
 
-  it("amountMetric で光熱費別に集計できる", () => {
-    const table = yoyByMonth([bucket("2026-06", 6000, { electricity: 6000 })], amountMetric("electricity"));
-    expect(table.rows[5]["2026"]).toBe(6000);
+  it("keeps months without data as null instead of zero", () => {
+    const t = yearOverYear(monthly, totalMetric);
+    expect(t.rows[0]).toMatchObject({ current: null, previous: null, delta: null, deltaPct: null });
+  });
+
+  it("lets the caller pick an older year as the base", () => {
+    const t = yearOverYear(monthly, totalMetric, "2025");
+    expect(t.current).toBe("2025");
+    expect(t.previous).toBe("2024");
+    expect(t.rows[5]).toMatchObject({ current: 5000, previous: 4000, delta: 1000 });
+    // 2024-07 is missing, so there is nothing to compare against
+    expect(t.rows[6]).toMatchObject({ current: 2000, previous: null, delta: null, deltaPct: null });
+  });
+
+  it("falls back to the latest year when the requested year has no data", () => {
+    expect(yearOverYear(monthly, totalMetric, "2019").current).toBe("2026");
+  });
+
+  it("has no previous year when only one year exists", () => {
+    const t = yearOverYear([bucket("2026-06", 6000)], totalMetric);
+    expect(t.current).toBe("2026");
+    expect(t.previous).toBeNull();
+    expect(t.rows[5]).toMatchObject({ current: 6000, previous: null, delta: null });
+  });
+
+  it("returns an empty table for no data", () => {
+    const t = yearOverYear([], totalMetric);
+    expect(t).toMatchObject({ years: [], current: null, previous: null });
+    expect(t.rows.every((r) => r.current === null && r.previous === null)).toBe(true);
+  });
+
+  it("leaves the percentage null when last year was zero", () => {
+    const t = yearOverYear([bucket("2025-06", 0), bucket("2026-06", 500)], totalMetric);
+    expect(t.rows[5]).toMatchObject({ delta: 500, deltaPct: null });
+  });
+
+  it("sums per utility with amountMetric", () => {
+    const t = yearOverYear([bucket("2026-06", 6000, { electricity: 4500 })], amountMetric("electricity"));
+    expect(t.rows[5].current).toBe(4500);
+  });
+});
+
+describe("yoyTotals", () => {
+  it("sums only the months that exist in both years", () => {
+    const t = yearOverYear(
+      [bucket("2025-06", 5000), bucket("2025-08", 9999), bucket("2026-06", 6000), bucket("2026-07", 3000)],
+      totalMetric
+    );
+    expect(yoyTotals(t.rows)).toEqual({ months: 1, current: 6000, previous: 5000, delta: 1000, deltaPct: 0.2 });
+  });
+
+  it("returns null when no month can be compared", () => {
+    expect(yoyTotals(yearOverYear([bucket("2026-06", 6000)], totalMetric).rows)).toBeNull();
+  });
+
+  it("leaves the percentage null when last year's total was zero", () => {
+    const t = yearOverYear([bucket("2025-06", 0), bucket("2026-06", 500)], totalMetric);
+    expect(yoyTotals(t.rows)).toMatchObject({ delta: 500, deltaPct: null });
+  });
+});
+
+describe("refLabelSides", () => {
+  it("puts the higher line's label above and the lower one's below", () => {
+    expect(refLabelSides(22000, 23235)).toEqual(["below", "above"]);
+    expect(refLabelSides(25000, 20000)).toEqual(["above", "below"]);
+  });
+
+  it("splits equal values too so the labels never share a row", () => {
+    expect(refLabelSides(1000, 1000)).toEqual(["above", "below"]);
   });
 });
 

@@ -204,7 +204,7 @@ export function Dashboard() {
                 <CostChart data={monthly} />
                 {monthly.length > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    紫の点線は一般家庭（二人以上世帯）の月平均光熱費の目安（家計調査ベースの概算）。
+                    「一般家庭の目安」は二人以上世帯の月平均光熱費の概算（家計調査ベース）。「この期間の平均」はグラフに出ている月の合計の平均です。
                   </p>
                 )}
                 {trimmedCount > 0 && (

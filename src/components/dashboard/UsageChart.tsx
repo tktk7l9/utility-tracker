@@ -17,7 +17,8 @@ import {
 import { UTILITIES, UTILITY_ORDER, type Utility } from "@/lib/domain";
 import { monthLabel, usageSeriesFor } from "@/lib/aggregate";
 import type { Reading } from "@/lib/domain";
-import { cn, formatNumber, formatYen } from "@/lib/utils";
+import { formatNumber, formatYen } from "@/lib/utils";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 import { ChartTooltip, RefLineLabel } from "./ChartTooltip";
 
 function shortMonth(month: string): string {
@@ -36,18 +37,9 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
     <div className="space-y-3">
       <div className="flex gap-1.5">
         {UTILITY_ORDER.map((u) => (
-          <button
-            key={u}
-            type="button"
-            onClick={() => setUtility(u)}
-            className={cn(
-              "rounded-md border px-3 py-1 text-sm font-medium transition-colors",
-              u === utility ? "border-transparent text-neutral-900 shadow-sm" : "bg-background hover:bg-accent"
-            )}
-            style={u === utility ? { backgroundColor: UTILITIES[u].color } : undefined}
-          >
+          <ToggleChip key={u} pressed={u === utility} color={UTILITIES[u].color} onClick={() => setUtility(u)}>
             {UTILITIES[u].label}
-          </button>
+          </ToggleChip>
         ))}
       </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, formatYen, formatNumber, formatPercent, formatDate, formatPeriod } from "./utils";
+import { cn, formatYen, formatSignedYen, formatNumber, formatPercent, formatDate, formatPeriod } from "./utils";
 
 describe("cn", () => {
   it("クラスを結合し falsy を除去", () => {
@@ -14,6 +14,14 @@ describe("formatYen", () => {
   it("四捨五入して桁区切り＋円", () => {
     expect(formatYen(1234.6)).toBe("1,235円");
     expect(formatYen(0)).toBe("0円");
+  });
+});
+
+describe("formatSignedYen", () => {
+  it("adds a plus sign only to increases", () => {
+    expect(formatSignedYen(1200)).toBe("+1,200円");
+    expect(formatSignedYen(-800)).toBe("-800円");
+    expect(formatSignedYen(0)).toBe("0円");
   });
 });
 

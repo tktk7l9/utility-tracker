@@ -9,15 +9,18 @@ export function RefLineLabel({
   text,
   color = "var(--foreground)",
   align = "right",
+  side = "above",
 }: {
   viewBox?: { x: number; y: number; width: number; height: number };
   text: string;
   color?: string;
   align?: "left" | "right";
+  /** Draw the label above or below its line; used to keep two close lines' labels apart. */
+  side?: "above" | "below";
 }) {
   if (!viewBox) return null;
   const x = align === "right" ? viewBox.x + viewBox.width - 4 : viewBox.x + 4;
-  const y = viewBox.y - 5;
+  const y = side === "above" ? viewBox.y - 5 : viewBox.y + 13;
   return (
     <text
       x={x}
