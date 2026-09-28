@@ -30,7 +30,7 @@ jobs:
             "$SUPABASE_URL/rest/v1/readings?select=id&limit=1") || status=000
           echo "HTTP $status"
           if [ "$status" != "200" ]; then
-            echo "::error::Supabase が HTTP $status を返しました。000 は停止中（DNS なし）の可能性が高いので Dashboard から Restore してください"
+            echo "::error::Supabase returned HTTP $status. 000 most likely means the project is paused (no DNS); restore it from the Dashboard"
             cat response.json 2>/dev/null || true
             exit 1
           fi

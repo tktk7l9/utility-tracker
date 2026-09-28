@@ -42,19 +42,19 @@ const LPIO_2026_08 = [
 ].join("\n");
 
 describe("detectBillKind", () => {
-  it("事業者名から請求書の種類を判別する", () => {
+  it("detects the bill type from the provider name", () => {
     expect(detectBillKind(TEPCO_2026_08)).toBe("tepco");
     expect(detectBillKind(LPIO_2026_08)).toBe("lpio");
   });
 
-  it("対応していない請求書は null", () => {
+  it("returns null for unsupported bills", () => {
     expect(detectBillKind("御請求書 株式会社エルピオ 灯油 18L")).toBeNull();
     expect(detectBillKind("")).toBeNull();
   });
 });
 
-describe("parseBillText（東京電力）", () => {
-  it("ご使用期間・請求金額・使用量を取り出す", () => {
+describe("parseBillText (TEPCO)", () => {
+  it("extracts the usage period, billed amount and usage", () => {
     expect(parseBillText(TEPCO_2026_08)).toEqual({
       ok: true,
       bills: [
@@ -71,7 +71,7 @@ describe("parseBillText（東京電力）", () => {
     });
   });
 
-  it("年をまたぐ期間は料金確定日の年から開始年を補う", () => {
+  it("fills the start year of a period spanning New Year from the billing-confirmed date", () => {
     const text = TEPCO_2026_08.replace("料金確定日 2026年 8月19日", "料金確定日 2027年 1月19日").replace(
       "ご使用期間 7月17日～ 8月18日",
       "ご使用期間 12月17日～ 1月16日"
@@ -82,7 +82,7 @@ describe("parseBillText（東京電力）", () => {
     });
   });
 
-  it("料金確定日が無ければ請求月の行（2026年08月）で年を補う", () => {
+  it("falls back to the billing-month line (2026年08月) for the year when there is no confirmed date", () => {
     const text = TEPCO_2026_08.replace("料金確定日 2026年 8月19日\n", "");
     expect(parseBillText(text)).toMatchObject({
       ok: true,
@@ -90,27 +90,27 @@ describe("parseBillText（東京電力）", () => {
     });
   });
 
-  it("年月が見つからなければエラー（更新年月日の「2026年 8月20日」は請求月とみなさない）", () => {
+  it("throws when no year-month is found (the renewal date \"2026年 8月20日\" is not a billing month)", () => {
     const text = TEPCO_2026_08.replace("料金確定日 2026年 8月19日\n", "").replace("2026年08月\n", "");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "請求の年月が見つかりません" });
   });
 
-  it("ご使用期間が無ければエラー", () => {
+  it("throws when the usage period is missing", () => {
     const text = TEPCO_2026_08.replace("ご使用期間 7月17日～ 8月18日\n", "");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "ご使用期間が見つかりません" });
   });
 
-  it("ご使用期間の日付を解釈できなければエラー", () => {
+  it("throws when the usage period dates cannot be parsed", () => {
     const text = TEPCO_2026_08.replace("ご使用期間 7月17日～ 8月18日", "ご使用期間 13月17日～ 8月18日");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "ご使用期間を解釈できません" });
   });
 
-  it("請求金額が無ければエラー", () => {
+  it("throws when the billed amount is missing", () => {
     const text = TEPCO_2026_08.replace("請求金額 20,277円 621kWhご使用量", "621kWhご使用量");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "請求金額が見つかりません" });
   });
 
-  it("使用量（kWh）が無ければ金額だけ取り込む", () => {
+  it("imports only the amount when the usage (kWh) is missing", () => {
     const text = TEPCO_2026_08.replace("621kWhご使用量", "ご使用量").replace("（1kWhあたり）", "（1単位あたり）");
     expect(parseBillText(text)).toMatchObject({
       ok: true,
@@ -118,14 +118,14 @@ describe("parseBillText（東京電力）", () => {
     });
   });
 
-  it("全角数字でも読める", () => {
+  it("reads full-width digits", () => {
     const text = TEPCO_2026_08.replace("請求金額 20,277円", "請求金額 ２０，２７７円");
     expect(parseBillText(text)).toMatchObject({ ok: true, bills: [{ amountYen: 20277 }] });
   });
 });
 
-describe("parseBillText（エルピオ）", () => {
-  it("ガス料金の明細行から期間・数量・金額を取り出す", () => {
+describe("parseBillText (LPIO)", () => {
+  it("extracts period, quantity and amount from the gas charge line", () => {
     expect(parseBillText(LPIO_2026_08)).toEqual({
       ok: true,
       bills: [
@@ -142,7 +142,7 @@ describe("parseBillText（エルピオ）", () => {
     });
   });
 
-  it("年をまたぐ期間は請求年月の年から補う", () => {
+  it("fills the year of a period spanning New Year from the billing year-month", () => {
     const text = LPIO_2026_08.replace("請求年月 2026年08月", "請求年月 2027年01月").replace(
       "07月06日～08月06日",
       "12月05日～01月06日"
@@ -153,7 +153,7 @@ describe("parseBillText（エルピオ）", () => {
     });
   });
 
-  it("ガス料金の明細行が複数あればそれぞれ取り込む", () => {
+  it("imports each gas charge line when there are several", () => {
     const text = LPIO_2026_08.replace(
       "基本料金 975.00円",
       "08/20 26082001 ガス料金（都市ガス） 08月06日～08月20日 5.0 1,020\n基本料金 975.00円"
@@ -168,12 +168,12 @@ describe("parseBillText（エルピオ）", () => {
     });
   });
 
-  it("請求年月が無ければエラー", () => {
+  it("throws when the billing year-month is missing", () => {
     const text = LPIO_2026_08.replace("請求年月 2026年08月\n", "");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "請求年月が見つかりません" });
   });
 
-  it("ガス料金の明細行が無ければエラー", () => {
+  it("throws when there is no gas charge line", () => {
     const text = LPIO_2026_08.replace(
       "08/06 26080601 ガス料金（都市ガス） 07月06日～08月06日 19.0 3,685",
       "ガス料金の明細は別紙をご覧ください"
@@ -181,7 +181,7 @@ describe("parseBillText（エルピオ）", () => {
     expect(parseBillText(text)).toEqual({ ok: false, reason: "ガス料金の明細行が見つかりません" });
   });
 
-  it("ガス料金の期間を解釈できなければエラー", () => {
+  it("throws when the gas charge period cannot be parsed", () => {
     const text = LPIO_2026_08.replace("07月06日～08月06日", "13月06日～08月06日");
     expect(parseBillText(text)).toEqual({ ok: false, reason: "ガス料金の期間を解釈できません" });
   });
@@ -214,8 +214,8 @@ const WATER_2026_07 = [
 
 const TODAY = new Date("2026-09-15T00:00:00Z");
 
-describe("parseBillText（東京都水道局）", () => {
-  it("康熙部首の文字でも判別でき、使用期間・合計請求金額・使用量を取り出す（年は使用月分の和暦から）", () => {
+describe("parseBillText (Tokyo Waterworks)", () => {
+  it("detects the bill even with Kangxi radical characters and extracts period, total billed amount and usage (year from the Japanese-era usage months)", () => {
     expect(detectBillKind(WATER_2026_07)).toBe("tokyo-water");
     expect(parseBillText(WATER_2026_07, TODAY)).toEqual({
       ok: true,
@@ -233,7 +233,7 @@ describe("parseBillText（東京都水道局）", () => {
     });
   });
 
-  it("メータ交換の月は差引使用量ではなく使用量（旧メータ分を含む）を採る", () => {
+  it("takes the usage (including the old meter) rather than the net usage in a meter-replacement month", () => {
     const text = WATER_2026_07.replace("使⽤量 43㎥", "使⽤量 28㎥")
       .replace("差引使⽤量 43㎥", "差引使⽤量 19㎥")
       .replace("旧メータ使⽤量", "旧メータ使⽤量 9㎥")
@@ -245,7 +245,7 @@ describe("parseBillText（東京都水道局）", () => {
     });
   });
 
-  it("年をまたぐ期間は使用月分の終わりの年から開始年を補う", () => {
+  it("fills the start year of a period spanning New Year from the year of the last usage month", () => {
     const text = WATER_2026_07.replace("8年 6⽉ 〜 8年 7⽉分", "7年12⽉ 〜 8年 1⽉分").replace(
       "使⽤期間 5⽉14⽇ 〜 7⽉10⽇",
       "使⽤期間 11⽉14⽇ 〜 1⽉10⽇"
@@ -256,7 +256,7 @@ describe("parseBillText（東京都水道局）", () => {
     });
   });
 
-  it("使用月分が1か月だけの表記でも年を補える", () => {
+  it("fills the year even when the usage months name a single month", () => {
     const text = WATER_2026_07.replace("8年 6⽉ 〜 8年 7⽉分", "8年 7⽉分");
     expect(parseBillText(text, TODAY)).toMatchObject({
       ok: true,
@@ -264,27 +264,27 @@ describe("parseBillText（東京都水道局）", () => {
     });
   });
 
-  it("使用月分が無ければエラー", () => {
+  it("throws when the usage months are missing", () => {
     const text = WATER_2026_07.replace("8年 6⽉ 〜 8年 7⽉分 ", "");
     expect(parseBillText(text, TODAY)).toEqual({ ok: false, reason: "使用月分が見つかりません" });
   });
 
-  it("使用期間が無ければエラー", () => {
+  it("throws when the usage period is missing", () => {
     const text = WATER_2026_07.replace("使⽤期間 5⽉14⽇ 〜 7⽉10⽇", "");
     expect(parseBillText(text, TODAY)).toEqual({ ok: false, reason: "使用期間が見つかりません" });
   });
 
-  it("使用期間の日付を解釈できなければエラー", () => {
+  it("throws when the usage period dates cannot be parsed", () => {
     const text = WATER_2026_07.replace("使⽤期間 5⽉14⽇", "使⽤期間 13⽉14⽇");
     expect(parseBillText(text, TODAY)).toEqual({ ok: false, reason: "使用期間を解釈できません" });
   });
 
-  it("合計請求金額が無ければエラー", () => {
+  it("throws when the total billed amount is missing", () => {
     const text = WATER_2026_07.replace("合計請求⾦額 8,193円", "");
     expect(parseBillText(text, TODAY)).toEqual({ ok: false, reason: "合計請求金額が見つかりません" });
   });
 
-  it("使用量が無ければ金額だけ取り込む", () => {
+  it("imports only the amount when the usage is missing", () => {
     const text = WATER_2026_07.replace(" 使⽤量 43㎥", "");
     expect(parseBillText(text, TODAY)).toMatchObject({
       ok: true,
@@ -293,8 +293,8 @@ describe("parseBillText（東京都水道局）", () => {
   });
 });
 
-describe("parseBillText（対応外）", () => {
-  it("東京電力・エルピオ・東京都水道局以外はエラー", () => {
+describe("parseBillText (unsupported)", () => {
+  it("throws for anything other than TEPCO, LPIO and Tokyo Waterworks", () => {
     expect(parseBillText("領収書 株式会社どこか 1,000円")).toEqual({
       ok: false,
       reason: "対応していない請求書です（東京電力・エルピオ・東京都水道局のみ）",
