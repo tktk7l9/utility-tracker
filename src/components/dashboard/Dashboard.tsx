@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Download, RotateCw, LogIn } from "lucide-react";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,6 +13,7 @@ import {
   bulkUpsert,
   deleteBuilding,
   deleteReading,
+  deleteReadings,
   fetchBuildings,
   fetchReadings,
   insertBuilding,
@@ -22,6 +23,9 @@ import {
   updateReading,
 } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import { readingKey } from "@/lib/csv";
+import { planImportUndo, withoutId } from "@/lib/undo";
+import { UndoToast, type UndoNotice } from "@/components/UndoToast";
 
 import { SummaryCards } from "./SummaryCards";
 import { ProviderLinks } from "./ProviderLinks";
@@ -52,6 +56,9 @@ export function Dashboard() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | "all">("all");
   const [tab, setTab] = useState("overview");
+  const [notice, setNotice] = useState<UndoNotice | null>(null);
+  const closeNotice = useCallback(() => setNotice(null), []);
+  const notify = (message: string, undo: () => Promise<void>) => setNotice({ id: Date.now(), message, undo });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,14 +97,34 @@ export function Dashboard() {
     setReadings((prev) => [...prev, inserted]);
   }
 
+  // Imports can overwrite records; keep what they replace so the notice can put it back (SHIG 54).
   async function handleImport(rows: NewReading[]) {
+    const plan = planImportUndo(rows, readings);
     await bulkUpsert(rows);
     setReadings(await fetchReadings());
+    const overwritten = plan.restore.length;
+    notify(
+      overwritten > 0 ? `${rows.length} 件を取り込みました（うち上書き ${overwritten} 件）` : `${rows.length} 件を取り込みました`,
+      async () => {
+        const added = new Set(plan.addedKeys);
+        const current = await fetchReadings();
+        await deleteReadings(current.filter((r) => added.has(readingKey(r))).map((r) => r.id));
+        await bulkUpsert(plan.restore);
+        setReadings(await fetchReadings());
+      }
+    );
   }
 
+  // Deletes run without a confirm dialog; the notice offers undo instead (SHIG 57, 54).
   async function handleDelete(id: string) {
+    const removed = readings.find((r) => r.id === id);
     await deleteReading(id);
     setReadings((prev) => prev.filter((r) => r.id !== id));
+    if (!removed) return;
+    notify("レコードを削除しました", async () => {
+      const restored = await insertReading(withoutId(removed));
+      setReadings((prev) => [...prev, restored]);
+    });
   }
 
   async function handleUpdate(id: string, patch: Partial<NewReading>) {
@@ -116,9 +143,15 @@ export function Dashboard() {
   }
 
   async function handleDeleteBuilding(id: string) {
+    const removed = buildings.find((b) => b.id === id);
     await deleteBuilding(id);
     setBuildings((prev) => prev.filter((b) => b.id !== id));
     if (selectedBuildingId === id) setSelectedBuildingId("all");
+    if (!removed) return;
+    notify(`建物「${removed.name}」を削除しました`, async () => {
+      const restored = await insertBuilding(withoutId(removed));
+      setBuildings((prev) => [...prev, restored]);
+    });
   }
 
   if (loading) {
@@ -312,6 +345,7 @@ export function Dashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+      <UndoToast notice={notice} onClose={closeNotice} />
     </div>
   );
 }

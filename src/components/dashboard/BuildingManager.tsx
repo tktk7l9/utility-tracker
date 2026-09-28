@@ -196,7 +196,6 @@ function BuildingEditRow({
       setErr(`記録が ${readingCount} 件あるため削除できません。先に「登録済みレコード」から記録を移すか削除してください。`);
       return;
     }
-    if (!window.confirm("この建物を削除します。元に戻せません。よろしいですか？")) return;
     setErr(null);
     setBusy(true);
     try {

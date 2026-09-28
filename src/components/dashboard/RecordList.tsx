@@ -189,7 +189,6 @@ function EditRow({
   }
 
   async function remove() {
-    if (!window.confirm("このレコードを削除します。元に戻せません。よろしいですか？")) return;
     setErr(null);
     setBusy(true);
     try {

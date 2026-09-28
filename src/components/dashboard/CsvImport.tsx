@@ -400,7 +400,7 @@ export function CsvImport({
                 期間が重なる登録済みの記録が {overlaps.length} 件あります
               </p>
               <p className="text-xs">
-                このまま取り込むと、重なった日数分が二重に計上されます。古い記録は「登録済みレコード」から削除してください。
+                このまま取り込むと、重なった日数分が二重に計上されます。古い記録は「記録」タブで開いて削除してください（削除は取り消せます）。
               </p>
               <ul className="space-y-0.5 text-xs">
                 {overlaps.map(({ incoming, existing }) => (
