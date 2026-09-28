@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, formatYen, formatNumber, formatPercent } from "./utils";
+import { cn, formatYen, formatNumber, formatPercent, formatDate, formatPeriod } from "./utils";
 
 describe("cn", () => {
   it("クラスを結合し falsy を除去", () => {
@@ -30,5 +30,23 @@ describe("formatPercent", () => {
     expect(formatPercent(0.2)).toBe("+20.0%");
     expect(formatPercent(-0.125)).toBe("-12.5%");
     expect(formatPercent(0)).toBe("0.0%");
+  });
+});
+
+describe("formatDate", () => {
+  it("uses slashes", () => {
+    expect(formatDate("2026-07-01")).toBe("2026/07/01");
+  });
+});
+
+describe("formatPeriod", () => {
+  it("omits the year of the end date within the same year", () => {
+    expect(formatPeriod("2026-07-01", "2026-08-31")).toBe("2026/07/01〜08/31");
+  });
+  it("keeps both years across a year boundary", () => {
+    expect(formatPeriod("2025-12-15", "2026-01-14")).toBe("2025/12/15〜2026/01/14");
+  });
+  it("leaves the end open when it is missing", () => {
+    expect(formatPeriod("2025-04-01", null)).toBe("2025/04/01〜");
   });
 });

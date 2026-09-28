@@ -183,6 +183,13 @@ export async function deleteReading(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/** Deletes several records at once (used to undo an import). */
+export async function deleteReadings(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await requireClient().from(TABLE).delete().in("id", ids);
+  if (error) throw new Error(error.message);
+}
+
 // ── 建物 ────────────────────────────────────────────────────────────
 export async function fetchBuildings(): Promise<Building[]> {
   const { data, error } = await requireClient()

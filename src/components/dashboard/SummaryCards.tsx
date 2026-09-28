@@ -1,7 +1,8 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Upload } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UTILITIES, UTILITY_ORDER } from "@/lib/domain";
 import { monthLabel, periodStats, summarize, type MonthlyBucket } from "@/lib/aggregate";
@@ -16,15 +17,25 @@ function signedYen(v: number): string {
   return `${v > 0 ? "+" : ""}${formatYen(v)}`;
 }
 
-export function SummaryCards({ monthly }: { monthly: MonthlyBucket[] }) {
+export function SummaryCards({
+  monthly,
+  onStartImport,
+}: {
+  monthly: MonthlyBucket[];
+  /** Opens the import tab from the empty state (SHIG 30/41). */
+  onStartImport: () => void;
+}) {
   const { latest, latestMonth, yoyDelta, yoyPct } = summarize(monthly);
   const stats = periodStats(monthly);
 
   if (!latest || !latestMonth) {
     return (
       <Card>
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          まだデータがありません。「入力・管理」タブから手入力するか、CSV を取り込んでください。
+        <CardContent className="space-y-3 py-8 text-center text-sm text-muted-foreground">
+          <p>電気・ガス・水道の請求書を取り込むと、月ごとの合計と前年同月比が見られます。</p>
+          <Button onClick={onStartImport}>
+            <Upload className="size-4" /> 請求書を取り込む
+          </Button>
         </CardContent>
       </Card>
     );

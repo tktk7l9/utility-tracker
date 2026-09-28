@@ -45,7 +45,7 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
   if (data.length === 0) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">
-        データがありません。「入力・管理」タブから追加してください。
+        まだデータがありません。
       </p>
     );
   }
