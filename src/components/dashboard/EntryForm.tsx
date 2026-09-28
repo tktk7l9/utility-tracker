@@ -173,7 +173,11 @@ export function EntryForm({
         <Input id={`${id}-note`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="燃料費調整の変動 など" />
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {ok && <p className="text-sm text-success">保存しました。</p>}
 
       <Button type="submit" disabled={busy}>

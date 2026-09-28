@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Check, ChevronDown, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,12 @@ export function RecordList({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const rowButtons = useRef(new Map<string, HTMLButtonElement>());
+  // Closing the editor removes the focused 保存/キャンセル button; hand focus back to the row.
+  const closeEditor = (id: string) => {
+    setEditingId(null);
+    rowButtons.current.get(id)?.focus();
+  };
   const sorted = [...readings].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
   const shown = sorted.slice(0, limit);
 
@@ -65,9 +71,13 @@ export function RecordList({
           return (
             <li key={r.id}>
               <button
+                ref={(el) => {
+                  if (el) rowButtons.current.set(r.id, el);
+                  else rowButtons.current.delete(r.id);
+                }}
                 type="button"
                 aria-expanded={isEditing}
-                aria-label={`${meta.label} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を編集`}
+                aria-label={`${meta.label} ${buildingName} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を編集`}
                 onClick={() => setEditingId(isEditing ? null : r.id)}
                 className={cn(
                   ROW_GRID,
@@ -104,10 +114,10 @@ export function RecordList({
                   <EditRow
                     reading={r}
                     buildings={buildings}
-                    onCancel={() => setEditingId(null)}
+                    onCancel={() => closeEditor(r.id)}
                     onSave={async (patch) => {
                       await onUpdate(r.id, patch);
-                      setEditingId(null);
+                      closeEditor(r.id);
                     }}
                     onDelete={async () => {
                       await onDelete(r.id);
@@ -160,6 +170,10 @@ function EditRow({
     const amountYen = parseLenientNumber(amount);
     if (amountYen == null || !Number.isFinite(amountYen) || amountYen < 0) {
       setErr("金額は0以上の数値で入力してください。");
+      return;
+    }
+    if (periodStart === "" || periodEnd === "") {
+      setErr("開始日と終了日を入力してください。");
       return;
     }
     if (periodEnd < periodStart) {

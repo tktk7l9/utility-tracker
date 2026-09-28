@@ -23,8 +23,7 @@ import {
   updateReading,
 } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
-import { readingKey } from "@/lib/csv";
-import { planImportUndo, withoutId } from "@/lib/undo";
+import { planImportUndo, undoImport, withoutId } from "@/lib/undo";
 import { UndoToast, type UndoNotice } from "@/components/UndoToast";
 
 import { SummaryCards } from "./SummaryCards";
@@ -105,13 +104,7 @@ export function Dashboard() {
     const overwritten = plan.restore.length;
     notify(
       overwritten > 0 ? `${rows.length} 件を取り込みました（うち上書き ${overwritten} 件）` : `${rows.length} 件を取り込みました`,
-      async () => {
-        const added = new Set(plan.addedKeys);
-        const current = await fetchReadings();
-        await deleteReadings(current.filter((r) => added.has(readingKey(r))).map((r) => r.id));
-        await bulkUpsert(plan.restore);
-        setReadings(await fetchReadings());
-      }
+      async () => setReadings(await undoImport(plan, { fetchReadings, deleteReadings, bulkUpsert }))
     );
   }
 

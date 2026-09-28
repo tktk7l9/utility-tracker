@@ -29,3 +29,22 @@ export function planImportUndo(incoming: NewReading[], existing: Reading[]): Imp
   }
   return { restore, addedKeys };
 }
+
+/** The data operations an import undo needs (the Supabase layer in the app, a fake in tests). */
+export interface ImportUndoApi {
+  fetchReadings: () => Promise<Reading[]>;
+  deleteReadings: (ids: string[]) => Promise<void>;
+  bulkUpsert: (rows: NewReading[]) => Promise<void>;
+}
+
+/**
+ * Reverts an import: deletes the records it added and writes back the previous values of
+ * the records it overwrote. Returns the records as they are afterwards.
+ */
+export async function undoImport(plan: ImportUndoPlan, api: ImportUndoApi): Promise<Reading[]> {
+  const added = new Set(plan.addedKeys);
+  const current = await api.fetchReadings();
+  await api.deleteReadings(current.filter((r) => added.has(readingKey(r))).map((r) => r.id));
+  await api.bulkUpsert(plan.restore);
+  return api.fetchReadings();
+}

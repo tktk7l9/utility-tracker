@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,17 @@ export function BuildingManager({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const rowButtons = useRef(new Map<string, HTMLButtonElement>());
+  const addButton = useRef<HTMLButtonElement>(null);
+  // Closing a form removes the focused button inside it; hand focus back to what opened it.
+  const closeEditor = (id: string) => {
+    setEditingId(null);
+    rowButtons.current.get(id)?.focus();
+  };
+  const closeAddForm = () => {
+    flushSync(() => setAdding(false));
+    addButton.current?.focus();
+  };
   const sorted = sortBuildings(buildings);
 
   return (
@@ -52,6 +64,10 @@ export function BuildingManager({
               return (
                 <li key={b.id}>
                   <button
+                    ref={(el) => {
+                      if (el) rowButtons.current.set(b.id, el);
+                      else rowButtons.current.delete(b.id);
+                    }}
                     type="button"
                     aria-expanded={isEditing}
                     aria-label={`${b.name} を編集`}
@@ -80,10 +96,10 @@ export function BuildingManager({
                       <BuildingEditRow
                         building={b}
                         readingCount={count}
-                        onCancel={() => setEditingId(null)}
+                        onCancel={() => closeEditor(b.id)}
                         onSave={async (patch) => {
                           await onUpdate(b.id, patch);
-                          setEditingId(null);
+                          closeEditor(b.id);
                         }}
                         onDelete={async () => {
                           await onDelete(b.id);
@@ -101,14 +117,14 @@ export function BuildingManager({
 
       {adding ? (
         <BuildingAddForm
-          onCancel={() => setAdding(false)}
+          onCancel={closeAddForm}
           onSave={async (b) => {
             await onAdd(b);
-            setAdding(false);
+            closeAddForm();
           }}
         />
       ) : (
-        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+        <Button ref={addButton} variant="outline" size="sm" onClick={() => setAdding(true)}>
           <Plus className="size-4" /> 建物を追加
         </Button>
       )}
@@ -175,6 +191,10 @@ function BuildingEditRow({
     setErr(null);
     if (name.trim() === "") {
       setErr("名前を入力してください。");
+      return;
+    }
+    if (movedInOn === "") {
+      setErr("入居日を入力してください。");
       return;
     }
     if (movedOutOn !== "" && movedOutOn < movedInOn) {
