@@ -18,12 +18,16 @@ export default defineConfig({
       // List include explicitly so pure logic untouched by tests still shows up as 0% (exposes blind spots).
       // supabase.ts (network layer) and pdfText.ts (browser-only PDF.js call layer) are excluded
       // (same policy as excluding InteractiveMap in lifeplan-me; pdfBill.ts, the bill text parser itself, is measured).
-      include: ["src/lib/**/*.ts"],
+      // The UI layer (components and app) is measured too, with its own threshold below.
+      include: ["src/lib/**/*.ts", "src/components/**/*.tsx", "src/app/**/*.tsx"],
       exclude: ["**/*.test.{ts,tsx}", "src/lib/supabase.ts", "src/lib/pdfText.ts", "src/test-setup.ts"],
       reporter: ["text", "html"],
       // The core aggregation and CSV normalization logic keeps statements/functions/lines at 100% (regressions fail CI).
       thresholds: {
         "src/lib/**": { statements: 100, functions: 100, lines: 100, branches: 100 },
+        // UI floor = the level reached when the behavioural UI tests were added, minus 2 points, so it cannot regress.
+        // What stays uncovered is mostly recharts tooltip content (needs real pointer layout) and the unused separator.
+        "src/{components,app}/**": { statements: 94, functions: 92, lines: 95, branches: 87 },
       },
     },
   },

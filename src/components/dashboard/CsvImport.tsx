@@ -33,12 +33,14 @@ function isPdf(file: File): boolean {
 }
 
 function ColSelect({
+  id,
   value,
   onChange,
   maxCols,
   label,
   allowNone,
 }: {
+  id: string;
   value: number | null;
   onChange: (v: number | null) => void;
   maxCols: number;
@@ -47,6 +49,7 @@ function ColSelect({
 }) {
   return (
     <select
+      id={id}
       className={`${selectClass} w-full`}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -354,20 +357,20 @@ export function CsvImport({
             既存の同一期間レコードを上書きする（金額の訂正などを再取込する場合）
           </label>
           <div className="space-y-1">
-            <Label>検針日 / 期間終了列</Label>
-            <ColSelect value={colEnd} onChange={(v) => setColEnd(v ?? 0)} maxCols={maxCols} label={headerLabel} />
+            <Label htmlFor={`${id}-col-end`}>検針日 / 期間終了列</Label>
+            <ColSelect id={`${id}-col-end`} value={colEnd} onChange={(v) => setColEnd(v ?? 0)} maxCols={maxCols} label={headerLabel} />
           </div>
           <div className="space-y-1">
-            <Label>金額列</Label>
-            <ColSelect value={colAmount} onChange={(v) => setColAmount(v ?? 0)} maxCols={maxCols} label={headerLabel} />
+            <Label htmlFor={`${id}-col-amount`}>金額列</Label>
+            <ColSelect id={`${id}-col-amount`} value={colAmount} onChange={(v) => setColAmount(v ?? 0)} maxCols={maxCols} label={headerLabel} />
           </div>
           <div className="space-y-1">
-            <Label>期間開始列（任意）</Label>
-            <ColSelect value={colStart} onChange={setColStart} maxCols={maxCols} label={headerLabel} allowNone />
+            <Label htmlFor={`${id}-col-start`}>期間開始列（任意）</Label>
+            <ColSelect id={`${id}-col-start`} value={colStart} onChange={setColStart} maxCols={maxCols} label={headerLabel} allowNone />
           </div>
           <div className="space-y-1">
-            <Label>使用量列（任意）</Label>
-            <ColSelect value={colUsage} onChange={setColUsage} maxCols={maxCols} label={headerLabel} allowNone />
+            <Label htmlFor={`${id}-col-usage`}>使用量列（任意）</Label>
+            <ColSelect id={`${id}-col-usage`} value={colUsage} onChange={setColUsage} maxCols={maxCols} label={headerLabel} allowNone />
           </div>
         </div>
       )}
