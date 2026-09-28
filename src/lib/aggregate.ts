@@ -217,28 +217,96 @@ export function amountMetric(utility: Utility): Metric {
   return (b) => b[utility];
 }
 
-export interface YoYTable {
-  /** 対象年（昇順）。 */
-  years: string[];
-  /** 1..12 月 × 各年の値。recharts のグループ棒に直接渡せる形。 */
-  rows: Array<Record<string, number | string>>;
+export interface YoYRow {
+  monthNum: number;
+  label: string;
+  /** Value for the base year, or null when that month has no data. */
+  current: number | null;
+  /** Value for the year before, or null when that month has no data. */
+  previous: number | null;
+  /** current - previous, only when both exist. */
+  delta: number | null;
+  /** delta / previous, only when both exist and previous is not zero. */
+  deltaPct: number | null;
 }
 
-/** 月番号（1..12）ごとに、各年の値を横並びにした前年同月比テーブルを作る。 */
-export function yoyByMonth(monthly: MonthlyBucket[], metric: Metric): YoYTable {
-  const years = Array.from(new Set(monthly.map((b) => b.month.slice(0, 4)))).sort();
-  const rows: Array<Record<string, number | string>> = [];
-  for (let mn = 1; mn <= 12; mn++) {
-    const row: Record<string, number | string> = { monthNum: mn, label: `${mn}月` };
-    for (const y of years) row[y] = 0;
-    rows.push(row);
-  }
+export interface YoYComparison {
+  /** Years that have data, ascending. */
+  years: string[];
+  /** Base year ("this year"); null when there is no data. */
+  current: string | null;
+  /** The year before the base year when it has data, else null. */
+  previous: string | null;
+  /** Months 1..12. */
+  rows: YoYRow[];
+}
+
+/**
+ * Compare one year with the year before, month by month. Only two series, so the chart
+ * can tell them apart by shape (filled vs outlined) rather than by shades of one hue
+ * (SHIG 96). Missing months stay null so they are not drawn as a real zero.
+ */
+export function yearOverYear(monthly: MonthlyBucket[], metric: Metric, baseYear?: string): YoYComparison {
+  const byYear = new Map<string, Array<number | null>>();
   for (const b of monthly) {
     const year = b.month.slice(0, 4);
     const mn = Number(b.month.slice(5, 7));
-    rows[mn - 1][year] = (rows[mn - 1][year] as number) + metric(b);
+    let slots = byYear.get(year);
+    if (!slots) {
+      slots = Array.from({ length: 12 }, () => null);
+      byYear.set(year, slots);
+    }
+    slots[mn - 1] = (slots[mn - 1] ?? 0) + metric(b);
   }
-  return { years, rows };
+  const years = Array.from(byYear.keys()).sort();
+  const current = baseYear && byYear.has(baseYear) ? baseYear : (years[years.length - 1] ?? null);
+  const prevKey = current ? String(Number(current) - 1) : null;
+  const previous = prevKey && byYear.has(prevKey) ? prevKey : null;
+  const cur = current ? byYear.get(current) : undefined;
+  const prev = previous ? byYear.get(previous) : undefined;
+
+  const rows: YoYRow[] = [];
+  for (let i = 0; i < 12; i++) {
+    const c = cur?.[i] ?? null;
+    const p = prev?.[i] ?? null;
+    const delta = c !== null && p !== null ? c - p : null;
+    rows.push({
+      monthNum: i + 1,
+      label: `${i + 1}月`,
+      current: c,
+      previous: p,
+      delta,
+      deltaPct: delta !== null && p ? delta / p : null,
+    });
+  }
+  return { years, current, previous, rows };
+}
+
+export interface YoYTotals {
+  /** Number of months that have data in both years. */
+  months: number;
+  current: number;
+  previous: number;
+  delta: number;
+  deltaPct: number | null;
+}
+
+/** Totals over the months both years share, for a one-line text summary. Null when none. */
+export function yoyTotals(rows: YoYRow[]): YoYTotals | null {
+  const both = rows.filter((r) => r.delta !== null);
+  if (both.length === 0) return null;
+  const current = both.reduce((s, r) => s + (r.current as number), 0);
+  const previous = both.reduce((s, r) => s + (r.previous as number), 0);
+  const delta = current - previous;
+  return { months: both.length, current, previous, delta, deltaPct: previous ? delta / previous : null };
+}
+
+/**
+ * Where to put the labels of two horizontal reference lines so they never overlap:
+ * the higher line's label goes above it, the lower one's below it (SHIG 75).
+ */
+export function refLabelSides(a: number, b: number): ["above" | "below", "above" | "below"] {
+  return a >= b ? ["above", "below"] : ["below", "above"];
 }
 
 export interface SeasonalPoint {

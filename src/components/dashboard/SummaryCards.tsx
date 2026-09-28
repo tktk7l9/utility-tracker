@@ -6,15 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UTILITIES, UTILITY_ORDER } from "@/lib/domain";
 import { monthLabel, periodStats, summarize, type MonthlyBucket } from "@/lib/aggregate";
-import { formatPercent, formatYen } from "@/lib/utils";
+import { formatPercent, formatSignedYen, formatYen } from "@/lib/utils";
 
 function daysInMonth(monthKey: string): number {
   const [y, m] = monthKey.split("-").map(Number);
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
-}
-
-function signedYen(v: number): string {
-  return `${v > 0 ? "+" : ""}${formatYen(v)}`;
 }
 
 export function SummaryCards({
@@ -66,7 +62,7 @@ export function SummaryCards({
               {yoyDelta != null && (
                 <p className={`mt-1.5 flex items-center gap-1 text-sm ${trendClass}`}>
                   <Trend className="size-4 shrink-0" />
-                  前年同月比 {signedYen(yoyDelta)}
+                  前年同月比 {formatSignedYen(yoyDelta)}
                   {yoyPct != null && <span className="text-muted-foreground">（{formatPercent(yoyPct)}）</span>}
                 </p>
               )}
@@ -80,7 +76,7 @@ export function SummaryCards({
               <div>
                 <dt className="text-xs text-muted-foreground">前月比</dt>
                 <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">
-                  {momDelta != null ? signedYen(momDelta) : "—"}
+                  {momDelta != null ? formatSignedYen(momDelta) : "—"}
                   {momPct != null && (
                     <span className="block text-xs font-normal text-muted-foreground">{formatPercent(momPct)}</span>
                   )}
@@ -88,7 +84,7 @@ export function SummaryCards({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">月平均比</dt>
-                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{signedYen(vsAvg)}</dd>
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{formatSignedYen(vsAvg)}</dd>
               </div>
             </dl>
           </div>

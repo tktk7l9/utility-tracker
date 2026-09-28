@@ -16,6 +16,7 @@ import { findPeriodOverlaps } from "@/lib/overlaps";
 import { decodeCsv, type CsvEncoding } from "@/lib/encoding";
 import { formatPeriod, formatYen } from "@/lib/utils";
 import { friendlyError } from "@/lib/errors";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -266,22 +267,17 @@ export function CsvImport({
             <Label>種別</Label>
             <div className="flex gap-1.5">
               {UTILITY_ORDER.map((u) => (
-                <button
+                <ToggleChip
                   key={u}
-                  type="button"
+                  pressed={u === utility}
+                  color={UTILITIES[u].color}
                   onClick={() => {
                     setUtility(u);
                     setDetectedUtility(undefined);
                   }}
-                  aria-pressed={u === utility}
-                  className={
-                    "rounded-md border px-3 py-1.5 text-sm transition-colors " +
-                    (u === utility ? "border-transparent text-neutral-900" : "bg-background hover:bg-accent")
-                  }
-                  style={u === utility ? { backgroundColor: UTILITIES[u].color } : undefined}
                 >
                   {UTILITIES[u].label}
-                </button>
+                </ToggleChip>
               ))}
             </div>
           </div>

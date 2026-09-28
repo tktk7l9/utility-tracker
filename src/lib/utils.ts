@@ -10,6 +10,11 @@ export function formatYen(value: number): string {
   return `${Math.round(value).toLocaleString("ja-JP")}円`;
 }
 
+/** Signed yen for differences: 1200 -> "+1,200円", -800 -> "-800円". */
+export function formatSignedYen(value: number): string {
+  return `${value > 0 ? "+" : ""}${formatYen(value)}`;
+}
+
 /** 小数を桁指定で丸めて日本語ロケール表示（末尾ゼロは残さない）。 */
 export function formatNumber(value: number, digits = 1): string {
   const factor = 10 ** digits;

@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { HOUSEHOLD_AVERAGE, UTILITIES, UTILITY_ORDER } from "@/lib/domain";
-import { monthLabel, type MonthlyBucket } from "@/lib/aggregate";
+import { monthLabel, refLabelSides, type MonthlyBucket } from "@/lib/aggregate";
 import { formatYen } from "@/lib/utils";
 import { ChartTooltip, RefLineLabel } from "./ChartTooltip";
 
@@ -51,6 +51,10 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
   }
 
   const avg = data.reduce((s, b) => s + b.total, 0) / data.length;
+  // The two lines are often close (e.g. 22,000 vs 23,235): the higher one's label goes above
+  // it and the lower one's below, so they never overlap (SHIG 75). Each line also has its own
+  // dash pattern and says what it is in its label, so neither relies on color (SHIG 96).
+  const [householdSide, avgSide] = refLabelSides(HOUSEHOLD_AVERAGE.total, avg);
 
   return (
     <ResponsiveContainer width="100%" height={360}>
@@ -75,15 +79,24 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
         <ReferenceLine
           y={HOUSEHOLD_AVERAGE.total}
           stroke="#7c3aed"
-          strokeDasharray="5 4"
-          label={<RefLineLabel text={`一般家庭 目安 ${formatYen(HOUSEHOLD_AVERAGE.total)}`} color="#7c3aed" align="left" />}
+          strokeWidth={1.5}
+          strokeDasharray="8 4"
+          label={
+            <RefLineLabel
+              text={`一般家庭の目安 ${formatYen(HOUSEHOLD_AVERAGE.total)}`}
+              color="#7c3aed"
+              align="left"
+              side={householdSide}
+            />
+          }
         />
         <ReferenceLine
           y={avg}
           stroke="var(--foreground)"
-          strokeOpacity={0.5}
-          strokeDasharray="5 4"
-          label={<RefLineLabel text={`平均 ${formatYen(avg)}`} align="right" />}
+          strokeOpacity={0.6}
+          strokeWidth={1.5}
+          strokeDasharray="2 3"
+          label={<RefLineLabel text={`この期間の平均 ${formatYen(avg)}`} align="right" side={avgSide} />}
         />
         <Tooltip
           cursor={{ fill: "var(--muted)", opacity: 0.4 }}
