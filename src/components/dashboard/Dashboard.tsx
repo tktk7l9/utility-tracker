@@ -23,6 +23,7 @@ import {
   updateBuilding,
   updateReading,
 } from "@/lib/supabase";
+import { parseLenientNumber } from "@/lib/number";
 import { formatYen } from "@/lib/utils";
 
 import { SummaryCards } from "./SummaryCards";
@@ -219,7 +220,7 @@ export function Dashboard() {
             <CardTitle className="text-base">手入力</CardTitle>
           </CardHeader>
           <CardContent>
-            <EntryForm buildings={buildings} defaultBuildingId={defaultBuildingId} onAdd={handleAdd} />
+            <EntryForm buildings={buildings} readings={readings} defaultBuildingId={defaultBuildingId} onAdd={handleAdd} />
           </CardContent>
         </Card>
 
@@ -434,8 +435,8 @@ function EditRow({
 
   async function save() {
     setErr(null);
-    const amountYen = Number(amount);
-    if (amount === "" || !Number.isFinite(amountYen) || amountYen < 0) {
+    const amountYen = parseLenientNumber(amount);
+    if (amountYen == null || !Number.isFinite(amountYen) || amountYen < 0) {
       setErr("金額は0以上の数値で入力してください。");
       return;
     }
@@ -443,7 +444,7 @@ function EditRow({
       setErr("終了日は開始日以降にしてください。");
       return;
     }
-    const usageValue = usage === "" ? null : Number(usage);
+    const usageValue = parseLenientNumber(usage);
     if (usageValue != null && (!Number.isFinite(usageValue) || usageValue < 0)) {
       setErr("使用量は0以上の数値で入力してください。");
       return;

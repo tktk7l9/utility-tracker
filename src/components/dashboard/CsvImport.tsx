@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { TriangleAlert, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { inferBuilding } from "@/lib/buildings";
 import { parseBillText, type ParsedBill } from "@/lib/pdfBill";
 import { extractPdfText } from "@/lib/pdfText";
 import { findPeriodOverlaps } from "@/lib/overlaps";
+import { decodeCsv, type CsvEncoding } from "@/lib/encoding";
 import { formatYen } from "@/lib/utils";
 
 const selectClass =
@@ -69,8 +70,9 @@ export function CsvImport({
   existingReadings: Reading[];
   onImport: (readings: NewReading[]) => Promise<void>;
 }) {
+  const id = useId();
   const [rawText, setRawText] = useState("");
-  const [encoding, setEncoding] = useState("utf-8");
+  const [encoding, setEncoding] = useState<CsvEncoding>("utf-8");
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
   const [pdfFiles, setPdfFiles] = useState<PdfFileResult[]>([]);
   const [loadingPdf, setLoadingPdf] = useState(false);
@@ -111,9 +113,13 @@ export function CsvImport({
     setError(null);
   }
 
-  /** バッファを指定エンコーディングでデコードして反映する。resetCols=true で列既定を初期化。 */
-  function decodeAndLoad(buf: ArrayBuffer, enc: string, resetCols: boolean) {
-    const text = new TextDecoder(enc).decode(buf);
+  /**
+   * Decodes the buffer and shows it. Without `enc`, the encoding is detected (SHIG 29).
+   * resetCols=true re-applies the default column mapping.
+   */
+  function decodeAndLoad(buf: ArrayBuffer, enc: CsvEncoding | undefined, resetCols: boolean) {
+    const { text, encoding: used } = decodeCsv(buf, enc);
+    setEncoding(used);
     setRawText(text);
     if (resetCols) {
       applyDefaults(parseCsv(text));
@@ -172,14 +178,14 @@ export function CsvImport({
     try {
       const buf = await files[0].arrayBuffer();
       setBuffer(buf);
-      decodeAndLoad(buf, encoding, true);
+      decodeAndLoad(buf, undefined, true);
     } catch {
-      setError("ファイルを読み込めませんでした。エンコーディングを確認してください。");
+      setError("ファイルを読み込めませんでした。別のファイルを選ぶか、もう一度お試しください。");
     }
   }
 
   // 文字コードを切り替えたら、選択済みファイルを列マッピングを保ったまま再デコードする。
-  function onEncodingChange(enc: string) {
+  function onEncodingChange(enc: CsvEncoding) {
     setEncoding(enc);
     if (buffer) decodeAndLoad(buffer, enc, false);
   }
@@ -280,9 +286,9 @@ export function CsvImport({
           </div>
         )}
         <div className="space-y-1.5">
-          <Label htmlFor="building">建物</Label>
+          <Label htmlFor={`${id}-building`}>建物</Label>
           <select
-            id="building"
+            id={`${id}-building`}
             className={selectClass}
             value={buildingChoice}
             onChange={(e) => setBuildingChoice(e.target.value)}
@@ -295,22 +301,13 @@ export function CsvImport({
             ))}
           </select>
         </div>
-        {mode !== "pdf" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="enc">文字コード</Label>
-            <select id="enc" className={selectClass} value={encoding} onChange={(e) => onEncodingChange(e.target.value)}>
-              <option value="utf-8">UTF-8</option>
-              <option value="shift_jis">Shift_JIS</option>
-            </select>
-          </div>
-        )}
         <div className="space-y-1.5">
-          <Label htmlFor="file">CSV / PDF ファイル</Label>
+          <Label htmlFor={`${id}-file`}>CSV / PDF ファイル</Label>
           <Input
             type="file"
             accept=".csv,text/csv,.pdf,application/pdf"
             multiple
-            id="file"
+            id={`${id}-file`}
             onChange={onFile}
             className="h-9 file:mr-3 file:rounded file:bg-secondary file:px-2 file:py-1"
           />
@@ -338,6 +335,23 @@ export function CsvImport({
             <input type="checkbox" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} />
             1行目はヘッダ
           </label>
+          <details className="col-span-full text-sm">
+            <summary className="cursor-pointer text-muted-foreground">
+              文字コード: {encoding === "utf-8" ? "UTF-8" : "Shift_JIS"}（自動判定・文字化けするときは変更）
+            </summary>
+            <div className="mt-2 space-y-1">
+              <Label htmlFor={`${id}-enc`}>文字コード</Label>
+              <select
+                id={`${id}-enc`}
+                className={selectClass}
+                value={encoding}
+                onChange={(e) => onEncodingChange(e.target.value as CsvEncoding)}
+              >
+                <option value="utf-8">UTF-8</option>
+                <option value="shift_jis">Shift_JIS</option>
+              </select>
+            </div>
+          </details>
           <label className="col-span-full flex items-center gap-2 text-sm">
             <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
             既存の同一期間レコードを上書きする（金額の訂正などを再取込する場合）

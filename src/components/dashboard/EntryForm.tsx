@@ -1,37 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Utility } from "@/lib/domain";
+import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Reading, type Utility } from "@/lib/domain";
 import { inferBuilding } from "@/lib/buildings";
+import { parseLenientNumber } from "@/lib/number";
+import { suggestPeriod } from "@/lib/period";
 
 const selectClass =
   "h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function firstOfMonth(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-function lastOfMonth(d: Date): string {
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
-}
-
 export function EntryForm({
   buildings,
+  readings,
   defaultBuildingId,
   onAdd,
 }: {
   buildings: Building[];
+  /** Existing records, used to suggest the next billing period (SHIG 14/42). */
+  readings: Reading[];
   defaultBuildingId: string | null;
   onAdd: (r: NewReading) => Promise<void>;
 }) {
-  const now = new Date();
+  const id = useId();
   const [utility, setUtility] = useState<Utility>("electricity");
-  const [periodStart, setPeriodStart] = useState(firstOfMonth(now));
-  const [periodEnd, setPeriodEnd] = useState(lastOfMonth(now));
+  const [initialPeriod] = useState(() => suggestPeriod(readings, "electricity", new Date(), defaultBuildingId));
+  const [periodStart, setPeriodStart] = useState(initialPeriod.periodStart);
+  const [periodEnd, setPeriodEnd] = useState(initialPeriod.periodEnd);
   const [buildingChoice, setBuildingChoice] = useState(defaultBuildingId ?? "");
   const [amount, setAmount] = useState("");
   const [usage, setUsage] = useState("");
@@ -43,12 +41,20 @@ export function EntryForm({
   const meta = UTILITIES[utility];
   const inferred = inferBuilding(buildings, periodStart, periodEnd);
 
+  /** Switching the utility also moves the period to where that utility's records leave off. */
+  function chooseUtility(u: Utility) {
+    setUtility(u);
+    const next = suggestPeriod(readings, u, new Date(), buildingChoice || defaultBuildingId);
+    setPeriodStart(next.periodStart);
+    setPeriodEnd(next.periodEnd);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setOk(false);
-    const amountYen = Number(amount);
-    if (amount === "" || !Number.isFinite(amountYen) || amountYen < 0) {
+    const amountYen = parseLenientNumber(amount);
+    if (amountYen == null || !Number.isFinite(amountYen) || amountYen < 0) {
       setError("金額は0以上の数値で入力してください。");
       return;
     }
@@ -56,7 +62,7 @@ export function EntryForm({
       setError("期間の終了日は開始日以降にしてください。");
       return;
     }
-    const usageValue = usage === "" ? null : Number(usage);
+    const usageValue = parseLenientNumber(usage);
     if (usageValue != null && (!Number.isFinite(usageValue) || usageValue < 0)) {
       setError("使用量は0以上の数値で入力してください。");
       return;
@@ -85,6 +91,10 @@ export function EntryForm({
       setUsage("");
       setNote("");
       setOk(true);
+      // Move on to the following period so the next bill can be entered straight away.
+      const next = suggestPeriod([{ utility, buildingId, periodStart, periodEnd }], utility, new Date());
+      setPeriodStart(next.periodStart);
+      setPeriodEnd(next.periodEnd);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -101,7 +111,7 @@ export function EntryForm({
             <button
               key={u}
               type="button"
-              onClick={() => setUtility(u)}
+              onClick={() => chooseUtility(u)}
               aria-pressed={u === utility}
               className={
                 "rounded-md border px-3 py-1.5 text-sm transition-colors " +
@@ -113,13 +123,12 @@ export function EntryForm({
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">事業者: {meta.provider}（種別で自動設定）</p>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="building">建物</Label>
+        <Label htmlFor={`${id}-building`}>建物</Label>
         <select
-          id="building"
+          id={`${id}-building`}
           className={selectClass}
           value={buildingChoice}
           onChange={(e) => setBuildingChoice(e.target.value)}
@@ -133,28 +142,34 @@ export function EntryForm({
         </select>
       </div>
 
+      {utility === "water" && (
+        <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+          水道は2か月ごとの請求です。請求書の検針期間（約2か月）をそのまま入れると、月別のグラフでは日数で分けて表示します。
+        </p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="ps">検針期間（開始）</Label>
-          <Input id="ps" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} required />
+          <Label htmlFor={`${id}-ps`}>検針期間（開始）</Label>
+          <Input id={`${id}-ps`} type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="pe">検針期間（終了）</Label>
-          <Input id="pe" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} required />
+          <Label htmlFor={`${id}-pe`}>検針期間（終了）</Label>
+          <Input id={`${id}-pe`} type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="amt">請求額（円・税込）</Label>
-          <Input id="amt" inputMode="numeric" placeholder="例: 6200" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <Label htmlFor={`${id}-amt`}>請求額（円・税込）</Label>
+          <Input id={`${id}-amt`} inputMode="numeric" placeholder="例: 6,200" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="use">使用量（{meta.unit}・任意）</Label>
-          <Input id="use" inputMode="decimal" placeholder={`例: 24`} value={usage} onChange={(e) => setUsage(e.target.value)} />
+          <Label htmlFor={`${id}-use`}>使用量（{meta.unit}・任意）</Label>
+          <Input id={`${id}-use`} inputMode="decimal" placeholder={`例: 24`} value={usage} onChange={(e) => setUsage(e.target.value)} />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="note">メモ（任意）</Label>
-        <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="燃料費調整の変動 など" />
+        <Label htmlFor={`${id}-note`}>メモ（任意）</Label>
+        <Input id={`${id}-note`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="燃料費調整の変動 など" />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -163,9 +178,6 @@ export function EntryForm({
       <Button type="submit" disabled={busy}>
         {busy ? "保存中…" : "追加する"}
       </Button>
-      <p className="text-xs text-muted-foreground">
-        水道は隔月請求のため、検針期間（約2か月）をそのまま入力すると月次グラフに日割りで按分されます。
-      </p>
     </form>
   );
 }
