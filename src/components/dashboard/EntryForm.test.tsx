@@ -151,7 +151,7 @@ describe("EntryForm", () => {
     setPeriod("2026-07-01", "2026-07-31");
     await user.type(screen.getByLabelText("請求額（円・税込）"), "100");
     await user.click(screen.getByRole("button", { name: "追加する" }));
-    expect(screen.getByRole("alert").textContent).not.toBe("");
+    expect(screen.getByRole("alert").textContent).toBe("同じ建物・種別・期間の記録がすでにあります。期間か建物を確認してください。");
     expect((screen.getByLabelText("請求額（円・税込）") as HTMLInputElement).value).toBe("100");
     expect(screen.queryByText("保存しました。")).toBeNull();
     expect(screen.getByRole("button", { name: "追加する" }).hasAttribute("disabled")).toBe(false);

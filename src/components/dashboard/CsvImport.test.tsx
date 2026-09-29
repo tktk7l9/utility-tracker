@@ -157,10 +157,21 @@ describe("CsvImport with a CSV file", () => {
     const { user, fileInput } = setup({ defaultBuildingId: "b1" });
     await user.upload(fileInput, csvFile(TEPCO_CSV));
     expect(await screen.findByText(/文字コード: UTF-8/)).toBeTruthy();
+    const amountOption = () => screen.queryAllByRole("option", { name: "請求額(円)" });
+    expect(amountOption().length).toBeGreaterThan(0);
+    // Map the amount to the usage column by hand, so a re-detection on switching would show.
+    await user.selectOptions(screen.getByLabelText("金額列"), "使用量(kWh)");
+    expect(within(screen.getByRole("table")).getByText("100円")).toBeTruthy();
+
+    // Decoding UTF-8 bytes as Shift_JIS garbles the header, so the column labels change.
     await user.selectOptions(screen.getByLabelText("文字コード"), "Shift_JIS");
     expect(screen.getByText(/文字コード: Shift_JIS/)).toBeTruthy();
-    // The mapping is kept; the header text is now garbled, so the preview still has rows to import.
-    expect(screen.getByText(/取込 \d+ 件/)).toBeTruthy();
+    expect(amountOption()).toHaveLength(0);
+    // The hand-made mapping is kept, so the amounts are still read from the usage column.
+    expect(within(screen.getByRole("table")).getByText("100円")).toBeTruthy();
+
+    await user.selectOptions(screen.getByLabelText("文字コード"), "UTF-8");
+    expect(amountOption().length).toBeGreaterThan(0);
   });
 
   it("refuses several CSV files at once", async () => {

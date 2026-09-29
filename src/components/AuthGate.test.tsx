@@ -75,7 +75,8 @@ describe("AuthGate", () => {
     await user.type(await screen.findByLabelText("メールアドレス"), "someone@example.com");
     await user.type(screen.getByLabelText("パスワード"), "wrong");
     await user.click(screen.getByRole("button", { name: "ログイン" }));
-    expect(screen.getByRole("alert").textContent).not.toBe("");
+    // The raw Supabase message is translated into what to do next.
+    expect(screen.getByRole("alert").textContent).toBe("メールアドレスかパスワードが違います。");
     expect(screen.getByRole("button", { name: "ログイン" }).hasAttribute("disabled")).toBe(false);
   });
 

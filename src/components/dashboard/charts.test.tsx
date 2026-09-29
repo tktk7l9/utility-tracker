@@ -76,7 +76,8 @@ describe("UsageChart", () => {
   it("shows the average unit price for the chosen utility and switches with the chips", async () => {
     const user = userEvent.setup();
     render(<UsageChart readings={readings} />);
-    expect(screen.getByText(/^平均単価 ¥\d+$/)).toBeTruthy();
+    // (6,000 / 200 + 7,000 / 250) / 2 = 29 yen per kWh.
+    expect(screen.getByText("平均単価 ¥29")).toBeTruthy();
     expect(screen.getByText("使用量(kWh)")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "ガス" }));

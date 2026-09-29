@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -89,6 +89,9 @@ beforeEach(() => {
   db.buildings = [{ ...home }];
   db.seq = 0;
 });
+
+// Undo spies (window.confirm, URL object URLs, anchor clicks) so they cannot leak into later tests.
+afterEach(() => vi.restoreAllMocks());
 
 describe("Dashboard delete and undo", () => {
   it("deletes a record without a confirm dialog and puts every field back on undo", async () => {
@@ -299,6 +302,19 @@ describe("Dashboard entry", () => {
     expect(db.readings.map((r) => r.amountYen)).toEqual([6200]);
   });
 
+  it("files imported rows under the building chosen in the selector", async () => {
+    db.readings = [];
+    db.buildings.push({ id: "b2", name: "旧居", movedInOn: "2020-04-01", movedOutOn: "2024-03-31" });
+    const user = await renderLoaded();
+    await user.click(screen.getByRole("button", { name: "旧居" }));
+    await user.click(screen.getByRole("tab", { name: "取込" }));
+    // The period falls in 自宅's residence, but the explicit choice wins.
+    const csv = "年月,請求額(円)\n2026/07,6500\n";
+    await user.upload(screen.getByLabelText("CSV / PDF ファイル"), new File([csv], "tepco.csv", { type: "text/csv" }));
+    await user.click(await screen.findByRole("button", { name: "1 件を取り込む" }));
+    expect(db.readings.map((r) => r.buildingId)).toEqual(["b2"]);
+  });
+
   it("names the import without overwrites plainly", async () => {
     db.readings = [];
     const user = await renderLoaded();
@@ -346,11 +362,11 @@ describe("Dashboard records tab", () => {
   });
 
   it("downloads the records as JSON and CSV, and disables export without records", async () => {
-    const createObjectURL = vi.fn(() => "blob:x");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL }));
+    // jsdom has no object URLs; spy on them (restored in afterEach) instead of replacing the global URL.
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     const clicked: string[] = [];
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       clicked.push(this.download);
     });
     const user = await renderLoaded();
@@ -361,8 +377,6 @@ describe("Dashboard records tab", () => {
     expect(clicked[0]).toMatch(/^utility-tracker_\d{4}-\d{2}-\d{2}\.json$/);
     expect(clicked[1]).toMatch(/\.csv$/);
     expect(revokeObjectURL).toHaveBeenCalledTimes(2);
-    click.mockRestore();
-    vi.unstubAllGlobals();
   });
 
   it("disables export when there is nothing to export", async () => {
