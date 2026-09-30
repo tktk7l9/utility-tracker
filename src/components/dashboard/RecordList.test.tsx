@@ -91,6 +91,8 @@ describe("RecordList", () => {
     const { user } = setup([reading(0)]);
     await user.click(screen.getByRole("button", { name: "電気 0" }));
     expect(screen.getByText("電気のレコードはありません。")).toBeTruthy();
+    // No empty list (and its rule) is left under the message.
+    expect(screen.queryByRole("list")).toBeNull();
   });
 
   it("falls back to the building id when the name is unknown", () => {

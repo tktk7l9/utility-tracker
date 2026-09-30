@@ -43,14 +43,16 @@ export function SummaryCards({
   // For utility costs, going down is good (green) and going up is a warning (red).
   const trendClass = up ? "text-destructive" : down ? "text-success" : "text-muted-foreground";
 
-  const prevMonth = monthly.length >= 2 ? monthly[monthly.length - 2] : null;
-  const momDelta = prevMonth ? latest.total - prevMonth.total : null;
-  const momPct = prevMonth && prevMonth.total !== 0 ? (latest.total - prevMonth.total) / prevMonth.total : null;
-  const perDay = latest.total / daysInMonth(latestMonth);
-  const vsAvg = latest.total - stats.average;
   // A bill that has not arrived yet is a gap, not a drop to 0円 (SHIG 28, 56, 32).
   const missing = missingUtilities(monthly, latest);
   const missingSet = new Set(missing);
+  // With a bill still missing, the total is understated, so a comparison against it would read as a drop (SHIG 28).
+  const comparable = missing.length === 0;
+  const prevMonth = comparable && monthly.length >= 2 ? monthly[monthly.length - 2] : null;
+  const momDelta = prevMonth ? latest.total - prevMonth.total : null;
+  const momPct = prevMonth && prevMonth.total !== 0 ? (latest.total - prevMonth.total) / prevMonth.total : null;
+  const perDay = latest.total / daysInMonth(latestMonth);
+  const vsAvg = comparable ? latest.total - stats.average : null;
 
   return (
     <div className="space-y-3">
@@ -69,7 +71,7 @@ export function SummaryCards({
               <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-3xl">
                 {formatYen(latest.total)}
               </p>
-              {yoyDelta != null && (
+              {comparable && yoyDelta != null && (
                 <p className={`mt-1.5 flex items-center gap-1 text-sm ${trendClass}`}>
                   <Trend className="size-4 shrink-0" />
                   前年同月比 {formatSignedYen(yoyDelta)}
@@ -94,7 +96,9 @@ export function SummaryCards({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">月平均比</dt>
-                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{formatSignedYen(vsAvg)}</dd>
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">
+                  {vsAvg != null ? formatSignedYen(vsAvg) : "—"}
+                </dd>
               </div>
             </dl>
           </div>

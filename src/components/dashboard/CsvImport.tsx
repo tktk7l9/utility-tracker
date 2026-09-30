@@ -169,6 +169,8 @@ export function CsvImport({
     if (files.length === 0) return;
     setDone(null);
     setError(null);
+    // Each file is a fresh decision: a choice made for the last file must not stay ticked while the option is hidden (SHIG 57).
+    setOverwrite(false);
     const pdfCount = files.filter(isPdf).length;
     if (pdfCount > 0 && pdfCount < files.length) {
       setError("CSV と PDF は別々に選んでください。");
@@ -277,7 +279,10 @@ export function CsvImport({
           e.preventDefault();
           setDragging(true);
         }}
-        onDragLeave={() => setDragging(false)}
+        onDragLeave={(e) => {
+          // Moving over a child fires dragleave on the zone too; only leaving the zone itself ends the highlight.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);

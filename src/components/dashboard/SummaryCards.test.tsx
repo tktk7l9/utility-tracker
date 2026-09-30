@@ -70,6 +70,11 @@ describe("SummaryCards", () => {
     );
     expect(screen.getByText("電気は未登録")).toBeTruthy();
     expect(screen.getByText("3,300円")).toBeTruthy();
+    // An understated total is not compared: no "-5,700円 (-63%)" next to "未登録".
+    expect(screen.queryByText(/前年同月比/)).toBeNull();
+    expect(screen.queryByText(/-5,700円/)).toBeNull();
+    expect(screen.queryByText(/-63\.3%/)).toBeNull();
+    expect(screen.getAllByText("—")).toHaveLength(2);
     // The electricity card shows the gap, not a 0円 0% figure.
     const card = screen.getByText("電気").closest("div")!;
     expect(card.textContent).toContain("まだ記録がありません");

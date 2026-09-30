@@ -335,6 +335,20 @@ describe("CsvImport flow (SHIG 40, 67, 79, 25)", () => {
     expect(afterInput.files?.length ?? 0).toBe(0);
   });
 
+  it("does not carry a ticked overwrite box over to the next file (SHIG 57)", async () => {
+    pdf.results.set("tepco", { ok: true, bills: [{ ...bill, amountYen: 7300 }] });
+    const { user, fileInput } = setup({ existing: [existing] });
+    await user.upload(fileInput, pdfFile("tepco", "t.pdf"));
+    await user.click(await screen.findByRole("checkbox", { name: /上書きする/ }));
+    expect(screen.getByRole("button", { name: "1 件を取り込む（上書き 1 件）" })).toBeTruthy();
+
+    // Picking another file (here the same bill again) starts from "do not overwrite".
+    await user.upload(screen.getByLabelText("CSV / PDF ファイル"), pdfFile("tepco", "t2.pdf"));
+    await screen.findByText("重複スキップ 1 件");
+    expect((screen.getByRole("checkbox", { name: /上書きする/ }) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: "0 件を取り込む" })).toBeTruthy();
+  });
+
   it("keeps the overwrite option out of the way when nothing would be overwritten", async () => {
     const { user, fileInput } = setup();
     await user.upload(fileInput, csvFile(TEPCO_CSV));

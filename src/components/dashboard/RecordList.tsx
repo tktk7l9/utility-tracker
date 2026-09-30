@@ -77,85 +77,88 @@ export function RecordList({
       {sorted.length === 0 && filter !== "all" && (
         <p className="py-6 text-center text-sm text-muted-foreground">{UTILITIES[filter].label}のレコードはありません。</p>
       )}
+      {/* The header and the list go together: an empty filter shows the message alone, not a stray rule (SHIG 1). */}
       {sorted.length > 0 && (
-      <div className={cn(ROW_GRID, "hidden px-2 py-2 text-xs text-muted-foreground sm:grid")} aria-hidden>
-        <span>種別</span>
-        <span>建物</span>
-        <span>検針期間</span>
-        <span className="text-right">金額</span>
-        <span className="text-right">使用量</span>
-        <span>入力方法</span>
-        <span />
-      </div>
+        <>
+          <div className={cn(ROW_GRID, "hidden px-2 py-2 text-xs text-muted-foreground sm:grid")} aria-hidden>
+            <span>種別</span>
+            <span>建物</span>
+            <span>検針期間</span>
+            <span className="text-right">金額</span>
+            <span className="text-right">使用量</span>
+            <span>入力方法</span>
+            <span />
+          </div>
+          <ul className="divide-y border-y">
+            {shown.map((r) => {
+              const meta = UTILITIES[r.utility];
+              const isEditing = editingId === r.id;
+              const buildingName = buildingNameById.get(r.buildingId) ?? r.buildingId;
+              const usage = r.usageValue != null ? `${r.usageValue} ${r.usageUnit ?? meta.unit}` : null;
+              return (
+                <li key={r.id}>
+                  <button
+                    ref={(el) => {
+                      if (el) rowButtons.current.set(r.id, el);
+                      else rowButtons.current.delete(r.id);
+                    }}
+                    type="button"
+                    aria-expanded={isEditing}
+                    aria-label={`${meta.label} ${buildingName} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を編集`}
+                    onClick={() => setEditingId(isEditing ? null : r.id)}
+                    className={cn(
+                      ROW_GRID,
+                      "w-full px-2 py-2.5 text-left text-sm transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:py-2",
+                      isEditing && "bg-muted/40"
+                    )}
+                  >
+                    <span className="order-1 flex min-w-0 items-center gap-1.5 font-medium sm:order-none sm:font-normal">
+                      <span className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
+                      {meta.label}
+                      <span className="truncate font-normal text-muted-foreground sm:hidden">· {buildingName}</span>
+                    </span>
+                    <span className="hidden truncate text-muted-foreground sm:block">{buildingName}</span>
+                    <span className="order-3 whitespace-nowrap text-xs text-muted-foreground sm:order-none sm:text-sm sm:text-foreground">
+                      {formatPeriod(r.periodStart, r.periodEnd)}
+                    </span>
+                    <span className="order-2 text-right font-medium tabular-nums sm:order-none sm:font-normal">
+                      {formatYen(r.amountYen)}
+                    </span>
+                    <span className="order-4 text-right text-xs text-muted-foreground tabular-nums sm:order-none sm:text-sm">
+                      {usage ?? <span className="hidden sm:inline">—</span>}
+                    </span>
+                    <span className="hidden sm:block">
+                      <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{SOURCE_LABELS[r.source]}</Badge>
+                    </span>
+                    <ChevronDown
+                      aria-hidden
+                      className={cn("hidden size-4 text-muted-foreground transition-transform sm:block", isEditing && "rotate-180")}
+                    />
+                  </button>
+                  {isEditing && (
+                    // The editor sits below the row at full width, never inside a scrolling table (SHIG 82/30).
+                    <div className="border-t bg-muted/30 px-3 py-3">
+                      <EditRow
+                        reading={r}
+                        buildings={buildings}
+                        onCancel={() => closeEditor(r.id)}
+                        onSave={async (patch) => {
+                          await onUpdate(r.id, patch);
+                          closeEditor(r.id);
+                        }}
+                        onDelete={async () => {
+                          await onDelete(r.id);
+                          setEditingId(null);
+                        }}
+                      />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
-      <ul className="divide-y border-y">
-        {shown.map((r) => {
-          const meta = UTILITIES[r.utility];
-          const isEditing = editingId === r.id;
-          const buildingName = buildingNameById.get(r.buildingId) ?? r.buildingId;
-          const usage = r.usageValue != null ? `${r.usageValue} ${r.usageUnit ?? meta.unit}` : null;
-          return (
-            <li key={r.id}>
-              <button
-                ref={(el) => {
-                  if (el) rowButtons.current.set(r.id, el);
-                  else rowButtons.current.delete(r.id);
-                }}
-                type="button"
-                aria-expanded={isEditing}
-                aria-label={`${meta.label} ${buildingName} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を編集`}
-                onClick={() => setEditingId(isEditing ? null : r.id)}
-                className={cn(
-                  ROW_GRID,
-                  "w-full px-2 py-2.5 text-left text-sm transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:py-2",
-                  isEditing && "bg-muted/40"
-                )}
-              >
-                <span className="order-1 flex min-w-0 items-center gap-1.5 font-medium sm:order-none sm:font-normal">
-                  <span className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
-                  {meta.label}
-                  <span className="truncate font-normal text-muted-foreground sm:hidden">· {buildingName}</span>
-                </span>
-                <span className="hidden truncate text-muted-foreground sm:block">{buildingName}</span>
-                <span className="order-3 whitespace-nowrap text-xs text-muted-foreground sm:order-none sm:text-sm sm:text-foreground">
-                  {formatPeriod(r.periodStart, r.periodEnd)}
-                </span>
-                <span className="order-2 text-right font-medium tabular-nums sm:order-none sm:font-normal">
-                  {formatYen(r.amountYen)}
-                </span>
-                <span className="order-4 text-right text-xs text-muted-foreground tabular-nums sm:order-none sm:text-sm">
-                  {usage ?? <span className="hidden sm:inline">—</span>}
-                </span>
-                <span className="hidden sm:block">
-                  <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{SOURCE_LABELS[r.source]}</Badge>
-                </span>
-                <ChevronDown
-                  aria-hidden
-                  className={cn("hidden size-4 text-muted-foreground transition-transform sm:block", isEditing && "rotate-180")}
-                />
-              </button>
-              {isEditing && (
-                // The editor sits below the row at full width, never inside a scrolling table (SHIG 82/30).
-                <div className="border-t bg-muted/30 px-3 py-3">
-                  <EditRow
-                    reading={r}
-                    buildings={buildings}
-                    onCancel={() => closeEditor(r.id)}
-                    onSave={async (patch) => {
-                      await onUpdate(r.id, patch);
-                      closeEditor(r.id);
-                    }}
-                    onDelete={async () => {
-                      await onDelete(r.id);
-                      setEditingId(null);
-                    }}
-                  />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
       {sorted.length > shown.length && (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" onClick={() => setLimit((n) => n + PAGE_SIZE * 2)}>
