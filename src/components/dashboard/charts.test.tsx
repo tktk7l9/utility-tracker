@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { MonthlyBucket } from "@/lib/aggregate";
@@ -64,6 +64,14 @@ describe("CostChart", () => {
     expect(screen.getByText("26/05")).toBeTruthy();
     expect(Array.from(container.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["合計", "電気", "ガス", "水道"]);
   });
+
+  it("names the keyboard-focusable chart and says how to read it", () => {
+    const { container } = render(<CostChart data={[bucket("2026-05", 14000, 6000, 4000), bucket("2026-06", 16000, 6000, 4000)]} />);
+    const svg = container.querySelector('svg[role="application"]');
+    expect(svg?.getAttribute("tabindex")).toBe("0");
+    expect(svg?.querySelector("title")?.textContent).toBe("月別料金の推移");
+    expect(svg?.querySelector("desc")?.textContent).toContain("矢印キー");
+  });
 });
 
 describe("UsageChart", () => {
@@ -75,7 +83,7 @@ describe("UsageChart", () => {
 
   it("shows the average unit price for the chosen utility and switches with the chips", async () => {
     const user = userEvent.setup();
-    render(<UsageChart readings={readings} />);
+    const { container } = render(<UsageChart readings={readings} />);
     // (6,000 / 200 + 7,000 / 250) / 2 = 29 yen per kWh.
     expect(screen.getByText("平均単価 ¥29")).toBeTruthy();
     expect(screen.getByText("使用量(kWh)")).toBeTruthy();
@@ -83,6 +91,8 @@ describe("UsageChart", () => {
     await user.click(screen.getByRole("button", { name: "ガス" }));
     expect(screen.getByRole("button", { name: "ガス" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("使用量(m³)")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "種別" })).getAllByRole("button")).toHaveLength(3);
+    expect(container.querySelector('svg[role="application"] title')?.textContent).toBe("ガスの月別使用量と実効単価");
 
     await user.click(screen.getByRole("button", { name: "水道" }));
     expect(screen.getByText("水道のデータがありません。")).toBeTruthy();
@@ -99,6 +109,16 @@ describe("CompositionCard", () => {
   it("renders nothing without any cost", () => {
     const { container } = render(<CompositionCard data={[bucket("2026-05", 0, 0, 0)]} />);
     expect(container.textContent).toBe("");
+  });
+
+  it("hides the drawing from assistive tech, since the list carries the same numbers", () => {
+    const { container } = render(<CompositionCard data={[bucket("2026-05", 6000, 3000, 1000)]} />);
+    const svg = container.querySelector("svg.recharts-surface");
+    expect(svg?.closest('[aria-hidden="true"]')).toBeTruthy();
+    // No Tab stop on the chart or the pie layer either.
+    expect(container.querySelector('[tabindex="0"]')).toBeNull();
+    // The total in the middle is not in the list, so it must not be hidden with the drawing.
+    expect(screen.getByText("10,000円").closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it("lists each utility's share of the period", () => {
@@ -175,7 +195,12 @@ describe("ProviderLinks", () => {
   it("opens each provider's billing page in a new tab safely", () => {
     render(<ProviderLinks />);
     const links = screen.getAllByRole("link");
-    expect(links.map((a) => a.textContent)).toEqual(["電気（TEPCO）", "ガス（LPIO）", "水道（東京都水道局）"]);
+    // The accessible name says the link leaves the page (the icon alone is silent).
+    expect(links.map((a) => a.textContent)).toEqual([
+      "電気（TEPCO）（新しいタブで開きます）",
+      "ガス（LPIO）（新しいタブで開きます）",
+      "水道（東京都水道局）（新しいタブで開きます）",
+    ]);
     for (const a of links) {
       expect(a.getAttribute("target")).toBe("_blank");
       expect(a.getAttribute("rel")).toBe("noopener noreferrer");

@@ -53,7 +53,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (loading) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">読み込み中…</p>;
+    return (
+      <p role="status" className="py-16 text-center text-sm text-muted-foreground">
+        読み込み中…
+      </p>
+    );
   }
 
   if (!session) {

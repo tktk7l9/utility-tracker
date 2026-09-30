@@ -50,7 +50,7 @@ describe("AuthGate", () => {
   it("shows the content straight away when a session is stored", async () => {
     auth.session = session;
     render(<AuthGate>ダッシュボード</AuthGate>);
-    expect(screen.getByText("読み込み中…")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("読み込み中…");
     expect(await screen.findByText("ダッシュボード")).toBeTruthy();
   });
 

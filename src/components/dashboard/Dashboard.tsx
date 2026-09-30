@@ -148,7 +148,11 @@ export function Dashboard() {
   }
 
   if (loading) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">読み込み中…</p>;
+    return (
+      <p role="status" className="py-16 text-center text-sm text-muted-foreground">
+        読み込み中…
+      </p>
+    );
   }
   if (error) {
     return (
@@ -258,8 +262,9 @@ export function Dashboard() {
 
           <Card>
             <details className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-6 text-base font-semibold [&::-webkit-details-marker]:hidden">
-                手入力
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-6 [&::-webkit-details-marker]:hidden">
+                {/* A heading inside the summary, so heading navigation reaches this card like the others (SHIG 59). */}
+                <h2 className="text-base font-semibold">手入力</h2>
                 <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
                   PDF・CSV がないとき
                   <ChevronDown aria-hidden className="size-4 transition-transform group-open:rotate-180" />

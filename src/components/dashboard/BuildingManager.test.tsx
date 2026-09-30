@@ -84,6 +84,14 @@ describe("BuildingManager editing", () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
+  it("saves with Enter from a field", async () => {
+    const { user, onUpdate } = setup();
+    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    expect(screen.getByRole("button", { name: "削除" }).getAttribute("type")).toBe("button");
+    await user.type(screen.getByLabelText("名前"), "2{Enter}");
+    expect(onUpdate).toHaveBeenCalledWith("b0", { name: "旧居2", movedInOn: "2020-04-01", movedOutOn: "2024-03-31" });
+  });
+
   it("keeps the editor open with the reason when saving fails", async () => {
     const onUpdate = vi.fn().mockRejectedValue(new Error("保存に失敗しました"));
     const { user } = setup({ onUpdate });
@@ -140,6 +148,14 @@ describe("BuildingManager adding", () => {
     expect(onAdd).toHaveBeenCalledWith({ name: "新居", movedInOn: "2027-03-01", movedOutOn: null });
     const addButton = screen.getByRole("button", { name: "建物を追加" });
     expect(document.activeElement).toBe(addButton);
+  });
+
+  it("adds with Enter from a field", async () => {
+    const { user, onAdd } = setup();
+    await user.click(screen.getByRole("button", { name: "建物を追加" }));
+    fireEvent.change(screen.getByLabelText("入居日"), { target: { value: "2027-03-01" } });
+    await user.type(screen.getByLabelText("名前"), "新居{Enter}");
+    expect(onAdd).toHaveBeenCalledWith({ name: "新居", movedInOn: "2027-03-01", movedOutOn: null });
   });
 
   it("keeps a move-out date when one is given", async () => {

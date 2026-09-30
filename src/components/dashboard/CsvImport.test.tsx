@@ -58,6 +58,9 @@ describe("CsvImport with a CSV file", () => {
 
     expect(await screen.findByText("見出しから種別を「電気」と判別しました。")).toBeTruthy();
     expect(screen.getByText("取込 2 件")).toBeTruthy();
+    // The utility chips are one named group; the preview scrolls sideways on phones, so it is a focusable region.
+    expect(within(screen.getByRole("group", { name: "種別" })).getAllByRole("button")).toHaveLength(3);
+    expect(screen.getByRole("region", { name: "取り込む内容" }).getAttribute("tabindex")).toBe("0");
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("row")).toHaveLength(3);
     expect(within(table).getByText("3,200円")).toBeTruthy();
@@ -184,7 +187,7 @@ describe("CsvImport with a CSV file", () => {
   it("refuses CSV and PDF mixed together", async () => {
     const { user, fileInput } = setup();
     await user.upload(fileInput, [csvFile(TEPCO_CSV), pdfFile("x", "bill.pdf")]);
-    expect(screen.getByText("CSV と PDF は別々に選んでください。")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toBe("CSV と PDF は別々に選んでください。");
   });
 
   it("says so when the file cannot be read", async () => {

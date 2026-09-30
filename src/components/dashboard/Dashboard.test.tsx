@@ -199,7 +199,7 @@ function month(m: string, amountYen: number, over: Partial<Reading> = {}): Readi
 describe("Dashboard loading", () => {
   it("shows a loading message, then the overview", async () => {
     render(<Dashboard />);
-    expect(screen.getByText("読み込み中…")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("読み込み中…");
     expect(await screen.findByRole("tab", { name: "料金・総評", selected: true })).toBeTruthy();
   });
 
@@ -272,7 +272,8 @@ describe("Dashboard entry", () => {
     db.readings = [];
     const user = await renderLoaded();
     await user.click(screen.getByRole("tab", { name: "取込" }));
-    await user.click(screen.getByText("手入力"));
+    // Every card is reachable by heading navigation, the collapsed manual entry too (SHIG 59).
+    await user.click(screen.getByRole("heading", { name: "手入力" }));
     fireEvent.change(screen.getByLabelText("検針期間（開始）"), { target: { value: "2026-08-01" } });
     fireEvent.change(screen.getByLabelText("検針期間（終了）"), { target: { value: "2026-08-31" } });
     await user.type(screen.getByLabelText("請求額（円・税込）"), "7000");

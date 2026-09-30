@@ -107,8 +107,8 @@ export function EntryForm({
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label>種別</Label>
-        <div className="flex gap-1.5">
+        <Label id={`${id}-utility-label`}>種別</Label>
+        <div className="flex gap-1.5" role="group" aria-labelledby={`${id}-utility-label`}>
           {UTILITY_ORDER.map((u) => (
             <ToggleChip key={u} pressed={u === utility} color={UTILITIES[u].color} onClick={() => chooseUtility(u)}>
               {UTILITIES[u].label}
@@ -169,7 +169,10 @@ export function EntryForm({
           {error}
         </p>
       )}
-      {ok && <p className="text-sm text-success">保存しました。</p>}
+      {/* The live region stays mounted so the confirmation is announced when it appears. */}
+      <p aria-live="polite" className="text-sm text-success empty:hidden">
+        {ok && "保存しました。"}
+      </p>
 
       <Button type="submit" disabled={busy}>
         {busy ? "保存中…" : "追加する"}

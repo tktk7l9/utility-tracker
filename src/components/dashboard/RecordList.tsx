@@ -214,7 +214,14 @@ function EditRow({
   }
 
   return (
-    <div className="space-y-3">
+    // A form so Enter in any field saves; the other buttons opt out with type="button".
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="space-y-1">
           <Label htmlFor={`${id}-building`}>建物</Label>
@@ -258,17 +265,24 @@ function EditRow({
         </p>
       )}
       <div className="flex items-center gap-2">
-        <Button size="sm" disabled={busy} onClick={save}>
+        <Button type="submit" size="sm" disabled={busy}>
           <Check className="size-4" /> {busy ? "保存中…" : "保存"}
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onCancel}>
           <X className="size-4" /> キャンセル
         </Button>
         {/* Delete lives at the far end, away from 保存 (SHIG 16/78). */}
-        <Button size="sm" variant="ghost" disabled={busy} onClick={remove} className="ml-auto text-destructive hover:text-destructive">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={remove}
+          className="ml-auto text-destructive hover:text-destructive"
+        >
           <Trash2 className="size-4" /> 削除
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

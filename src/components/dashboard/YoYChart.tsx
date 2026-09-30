@@ -159,7 +159,13 @@ export function YoYChart({ data }: { data: MonthlyBucket[] }) {
           <YoYLegend current={current} previous={previous} />
 
           <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={merged} margin={{ top: 8, right: 8, bottom: 4, left: 4 }} barGap={2}>
+            <ComposedChart
+              data={merged}
+              margin={{ top: 8, right: 8, bottom: 4, left: 4 }}
+              barGap={2}
+              title={`${current}年と${previous ?? "前年"}の月別比較`}
+              desc="横軸は1〜12月。各月の左の枠が前年、右の塗りが今年、破線が季節平均です。矢印キーで月ごとの値を読み上げます。"
+            >
               <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"

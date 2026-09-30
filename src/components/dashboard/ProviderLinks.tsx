@@ -24,7 +24,8 @@ export function ProviderLinks() {
         >
           <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: UTILITIES[l.utility].color }} />
           {l.label}
-          <ExternalLink className="size-3.5 text-muted-foreground" />
+          <ExternalLink aria-hidden="true" className="size-3.5 text-muted-foreground" />
+          <span className="sr-only">（新しいタブで開きます）</span>
         </a>
       ))}
     </div>
