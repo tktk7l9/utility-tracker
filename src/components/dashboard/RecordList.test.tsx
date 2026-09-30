@@ -119,4 +119,24 @@ describe("RecordList", () => {
     await user.keyboard("{Enter}");
     expect(screen.getByLabelText("金額（円）")).toBeTruthy();
   });
+
+  it("saves with Enter from any field, without tabbing to the button", async () => {
+    const { user, onUpdate } = setup([reading(1)]);
+    await user.click(screen.getByRole("button", { name: /ガス 自宅/ }));
+    const amount = screen.getByLabelText("金額（円）");
+    await user.clear(amount);
+    await user.type(amount, "1,500{Enter}");
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(onUpdate).mock.calls[0][1].amountYen).toBe(1500);
+  });
+
+  it("does not delete or cancel on Enter inside the editor", async () => {
+    const { user, onDelete } = setup([reading(1)]);
+    await user.click(screen.getByRole("button", { name: /ガス 自宅/ }));
+    expect(screen.getByRole("button", { name: "削除" }).getAttribute("type")).toBe("button");
+    expect(screen.getByRole("button", { name: "キャンセル" }).getAttribute("type")).toBe("button");
+    await user.click(screen.getByLabelText("メモ"));
+    await user.keyboard("{Enter}");
+    expect(onDelete).not.toHaveBeenCalled();
+  });
 });

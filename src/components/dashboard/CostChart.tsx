@@ -58,7 +58,12 @@ export function CostChart({ data }: { data: MonthlyBucket[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={360}>
-      <ComposedChart data={data} margin={{ top: 16, right: 12, bottom: 4, left: 4 }}>
+      <ComposedChart
+        data={data}
+        margin={{ top: 16, right: 12, bottom: 4, left: 4 }}
+        title="月別料金の推移"
+        desc="電気・ガス・水道の料金を月ごとに積み上げた棒と、合計の線です。矢印キーで月ごとの値を読み上げます。"
+      >
         <defs>
           {UTILITY_ORDER.map((u) => (
             <linearGradient key={u} id={`cost-${u}`} x1="0" y1="0" x2="0" y2="1">

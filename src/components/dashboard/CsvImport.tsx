@@ -267,8 +267,8 @@ export function CsvImport({
       <div className="flex flex-wrap items-end gap-3">
         {mode !== "pdf" && (
           <div className="space-y-1.5">
-            <Label>種別</Label>
-            <div className="flex gap-1.5">
+            <Label id={`${id}-utility-label`}>種別</Label>
+            <div className="flex gap-1.5" role="group" aria-labelledby={`${id}-utility-label`}>
               {UTILITY_ORDER.map((u) => (
                 <ToggleChip
                   key={u}
@@ -317,17 +317,19 @@ export function CsvImport({
         PDF は東京電力・エルピオ・東京都水道局の請求書に対応し、複数まとめて選べます（この端末の中だけで読み取ります）。
       </p>
 
-      {loadingPdf && <p className="text-sm text-muted-foreground">PDF を読み取り中…</p>}
-
-      {mode === "csv" &&
-        detectedUtility !== undefined &&
-        (detectedUtility ? (
-          <p className="text-sm text-muted-foreground">
-            見出しから種別を「{UTILITIES[detectedUtility].label}」と判別しました。
-          </p>
-        ) : (
-          <p className="text-sm text-destructive">種別を判別できませんでした。種別が正しいか確認してください。</p>
-        ))}
+      {/* One always-mounted live region for progress and detection messages, so they are announced. */}
+      <div aria-live="polite" className="space-y-1 empty:hidden">
+        {loadingPdf && <p className="text-sm text-muted-foreground">PDF を読み取り中…</p>}
+        {mode === "csv" &&
+          detectedUtility !== undefined &&
+          (detectedUtility ? (
+            <p className="text-sm text-muted-foreground">
+              見出しから種別を「{UTILITIES[detectedUtility].label}」と判別しました。
+            </p>
+          ) : (
+            <p className="text-sm text-destructive">種別を判別できませんでした。種別が正しいか確認してください。</p>
+          ))}
+      </div>
 
       {mode === "csv" && (
         <div className="grid grid-cols-1 gap-3 rounded-md border bg-muted/40 p-3 @xs:grid-cols-2 @2xl:grid-cols-4">
@@ -413,12 +415,18 @@ export function CsvImport({
           )}
 
           {toInsert.length > 0 && (
-            <div className="overflow-x-auto rounded-md border">
+            // Scrolls sideways on phones, so it must be reachable by keyboard (WCAG 2.1.1).
+            <div
+              role="region"
+              aria-label="取り込む内容"
+              tabIndex={0}
+              className="overflow-x-auto rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <table className="w-full text-sm">
                 <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
                   <tr>
                     {mode === "pdf" && <th className="whitespace-nowrap px-3 py-2">種別</th>}
-                    <th className="px-3 py-2">建物</th>
+                    <th className="whitespace-nowrap px-3 py-2">建物</th>
                     <th className="px-3 py-2">期間</th>
                     <th className="whitespace-nowrap px-3 py-2">金額</th>
                     <th className="whitespace-nowrap px-3 py-2">使用量</th>
@@ -428,7 +436,7 @@ export function CsvImport({
                   {toInsert.slice(0, 6).map((r, i) => (
                     <tr key={i} className="border-t">
                       {mode === "pdf" && <td className="whitespace-nowrap px-3 py-1.5">{UTILITIES[r.utility].label}</td>}
-                      <td className="px-3 py-1.5">{buildingNameById.get(r.buildingId) ?? r.buildingId}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">{buildingNameById.get(r.buildingId) ?? r.buildingId}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">{formatPeriod(r.periodStart, r.periodEnd)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">{formatYen(r.amountYen)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">{r.usageValue ?? "—"}</td>
@@ -453,7 +461,12 @@ export function CsvImport({
         </>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {/* The undo notice announces the result; this line only confirms it visually. */}
       {done != null && <p className="text-sm text-success">{done} 件を取り込みました。</p>}
     </div>
   );

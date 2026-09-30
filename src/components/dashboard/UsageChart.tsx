@@ -35,7 +35,7 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5" role="group" aria-label="種別">
         {UTILITY_ORDER.map((u) => (
           <ToggleChip key={u} pressed={u === utility} color={UTILITIES[u].color} onClick={() => setUtility(u)}>
             {UTILITIES[u].label}
@@ -47,7 +47,12 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
         <p className="py-16 text-center text-sm text-muted-foreground">{meta.label}のデータがありません。</p>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <ComposedChart data={data} margin={{ top: 16, right: 8, bottom: 4, left: 4 }}>
+          <ComposedChart
+            data={data}
+            margin={{ top: 16, right: 8, bottom: 4, left: 4 }}
+            title={`${meta.label}の月別使用量と実効単価`}
+            desc="棒が使用量、線が実効単価です。矢印キーで月ごとの値を読み上げます。"
+          >
             <defs>
               <linearGradient id={`usage-${utility}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={meta.color} stopOpacity={0.95} />

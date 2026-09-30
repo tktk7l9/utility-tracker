@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { MonthlyBucket } from "@/lib/aggregate";
@@ -83,6 +83,7 @@ describe("UsageChart", () => {
     await user.click(screen.getByRole("button", { name: "ガス" }));
     expect(screen.getByRole("button", { name: "ガス" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("使用量(m³)")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "種別" })).getAllByRole("button")).toHaveLength(3);
 
     await user.click(screen.getByRole("button", { name: "水道" }));
     expect(screen.getByText("水道のデータがありません。")).toBeTruthy();
@@ -99,6 +100,14 @@ describe("CompositionCard", () => {
   it("renders nothing without any cost", () => {
     const { container } = render(<CompositionCard data={[bucket("2026-05", 0, 0, 0)]} />);
     expect(container.textContent).toBe("");
+  });
+
+  it("hides the drawing from assistive tech, since the list carries the same numbers", () => {
+    const { container } = render(<CompositionCard data={[bucket("2026-05", 6000, 3000, 1000)]} />);
+    const svg = container.querySelector("svg.recharts-surface");
+    expect(svg?.closest('[aria-hidden="true"]')).toBeTruthy();
+    // No Tab stop on the chart or the pie layer either.
+    expect(container.querySelector('[tabindex="0"]')).toBeNull();
   });
 
   it("lists each utility's share of the period", () => {
@@ -175,7 +184,12 @@ describe("ProviderLinks", () => {
   it("opens each provider's billing page in a new tab safely", () => {
     render(<ProviderLinks />);
     const links = screen.getAllByRole("link");
-    expect(links.map((a) => a.textContent)).toEqual(["電気（TEPCO）", "ガス（LPIO）", "水道（東京都水道局）"]);
+    // The accessible name says the link leaves the page (the icon alone is silent).
+    expect(links.map((a) => a.textContent)).toEqual([
+      "電気（TEPCO）（新しいタブで開きます）",
+      "ガス（LPIO）（新しいタブで開きます）",
+      "水道（東京都水道局）（新しいタブで開きます）",
+    ]);
     for (const a of links) {
       expect(a.getAttribute("target")).toBe("_blank");
       expect(a.getAttribute("rel")).toBe("noopener noreferrer");
