@@ -49,7 +49,7 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
         <ResponsiveContainer width="100%" height={340}>
           <ComposedChart
             data={data}
-            margin={{ top: 16, right: 8, bottom: 4, left: 4 }}
+            margin={{ top: 28, right: 8, bottom: 4, left: 4 }}
             title={`${meta.label}の月別使用量と実効単価`}
             desc="棒が使用量、線が実効単価です。矢印キーで月ごとの値を読み上げます。"
           >
@@ -67,7 +67,8 @@ export function UsageChart({ readings }: { readings: Reading[] }) {
               axisLine={false}
               tickLine={false}
               width={40}
-              label={{ value: meta.unit, position: "insideTopLeft", fontSize: 11, fill: "var(--muted-foreground)" }}
+              // Above the axis, clear of the top tick label (SHIG 75, 85).
+              label={{ value: meta.unit, position: "top", offset: 12, fontSize: 11, fill: "var(--muted-foreground)" }}
             />
             <YAxis
               yAxisId="price"

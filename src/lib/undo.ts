@@ -9,6 +9,16 @@ export function withoutId<T extends { id: string }>(row: T): Omit<T, "id"> {
   return rest;
 }
 
+/**
+ * The values `patch` replaced, taken from `before`, so an edit can be reverted with the same
+ * update call. Fields the patch did not touch are left out, so a later edit of another field survives.
+ */
+export function previousValues<T extends object>(before: T, patch: Partial<T>): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(patch) as Array<keyof T>) out[key] = before[key];
+  return out;
+}
+
 export interface ImportUndoPlan {
   /** Previous values of the records the import overwrites (upsert them back). */
   restore: NewReading[];

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { Building, NewReading, Reading } from "@/lib/domain";
@@ -282,5 +282,63 @@ describe("CsvImport with PDF bills", () => {
     release("tepco");
     expect(await screen.findByText("取込 1 件")).toBeTruthy();
     expect(screen.queryByText("PDF を読み取り中…")).toBeNull();
+  });
+});
+
+describe("CsvImport flow (SHIG 40, 67, 79, 25)", () => {
+  const bill = {
+    utility: "electricity" as const,
+    provider: "TEPCO",
+    periodStart: "2026-07-01",
+    periodEnd: "2026-07-31",
+    amountYen: 7100,
+    usageValue: 250,
+    usageUnit: "kWh",
+  };
+  const existing: Reading = { ...bill, id: "e1", buildingId: "b1", note: null, source: "pdf" };
+
+  it("asks for the file first and shows the utility chips only once a CSV is loaded", async () => {
+    const { user, fileInput } = setup();
+    expect(screen.queryByRole("button", { name: "ガス" })).toBeNull();
+    await user.upload(fileInput, csvFile(TEPCO_CSV));
+    expect(await screen.findByRole("button", { name: "ガス" })).toBeTruthy();
+  });
+
+  it("accepts a bill dropped onto the drop zone", async () => {
+    pdf.results.set("tepco", { ok: true, bills: [bill] });
+    setup();
+    const zone = screen.getByTestId("drop-zone");
+    fireEvent.dragOver(zone);
+    expect(zone.className).toContain("border-primary");
+    fireEvent.dragLeave(zone);
+    expect(zone.className).not.toContain("border-primary");
+    fireEvent.dragOver(zone);
+    fireEvent.drop(zone, { dataTransfer: { files: [pdfFile("tepco", "t.pdf")], types: ["Files"] } });
+    expect(zone.className).not.toContain("border-primary");
+    expect(await screen.findByText("取込 1 件")).toBeTruthy();
+    expect(within(screen.getByRole("table")).getByText("7,100円")).toBeTruthy();
+  });
+
+  it("offers to overwrite a duplicate PDF bill and clears the file field after the import", async () => {
+    pdf.results.set("tepco", { ok: true, bills: [{ ...bill, amountYen: 7300 }] });
+    const onImport = vi.fn<(r: NewReading[]) => Promise<void>>().mockResolvedValue(undefined);
+    const { user, fileInput } = setup({ existing: [existing], onImport });
+    expect(screen.queryByRole("checkbox", { name: /上書きする/ })).toBeNull();
+    await user.upload(fileInput, pdfFile("tepco", "t.pdf"));
+    expect(await screen.findByText("重複スキップ 1 件")).toBeTruthy();
+
+    await user.click(screen.getByRole("checkbox", { name: /上書きする/ }));
+    await user.click(screen.getByRole("button", { name: "1 件を取り込む（上書き 1 件）" }));
+    expect(onImport.mock.calls[0][0][0].amountYen).toBe(7300);
+    expect(screen.getByText("1 件を取り込みました。")).toBeTruthy();
+    const afterInput = screen.getByLabelText("CSV / PDF ファイル") as HTMLInputElement;
+    expect(afterInput.files?.length ?? 0).toBe(0);
+  });
+
+  it("keeps the overwrite option out of the way when nothing would be overwritten", async () => {
+    const { user, fileInput } = setup();
+    await user.upload(fileInput, csvFile(TEPCO_CSV));
+    await screen.findByText("取込 2 件");
+    expect(screen.queryByRole("checkbox", { name: /上書きする/ })).toBeNull();
   });
 });

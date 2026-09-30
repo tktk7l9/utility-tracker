@@ -6,7 +6,7 @@ import { ChevronDown, Download, RotateCw, LogIn } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Building, NewBuilding, NewReading, Reading } from "@/lib/domain";
+import { UTILITIES, type Building, type NewBuilding, type NewReading, type Reading } from "@/lib/domain";
 import { toMonthlySeries, trimIncompleteEnds } from "@/lib/aggregate";
 import { toCsv, toExportJson, exportFilename } from "@/lib/export";
 import {
@@ -23,7 +23,8 @@ import {
   updateReading,
 } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
-import { planImportUndo, undoImport, withoutId } from "@/lib/undo";
+import { planImportUndo, previousValues, undoImport, withoutId } from "@/lib/undo";
+import { formatPeriod, formatYen } from "@/lib/utils";
 import { UndoToast, type UndoNotice } from "@/components/UndoToast";
 
 import { SummaryCards } from "./SummaryCards";
@@ -50,11 +51,37 @@ function download(filename: string, text: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+const TAB_KEYS = ["overview", "usage", "yoy", "entry", "records"] as const;
+type TabKey = (typeof TAB_KEYS)[number];
+
+function isTabKey(v: string): v is TabKey {
+  return (TAB_KEYS as readonly string[]).includes(v);
+}
+
+/** The tab named in the URL hash, so a reload or a shared link lands on the same view (SHIG 59, 76). */
+function tabFromHash(): TabKey {
+  if (typeof window === "undefined") return "overview";
+  const key = window.location.hash.slice(1);
+  return isTabKey(key) ? key : "overview";
+}
+
 export function Dashboard() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | "all">("all");
-  const [tab, setTab] = useState("overview");
+  const [tab, setTabState] = useState<TabKey>(tabFromHash);
+  const setTab = useCallback((value: string) => {
+    if (!isTabKey(value)) return;
+    setTabState(value);
+    const { pathname, search } = window.location;
+    // replaceState keeps the browser's back button for leaving the app, not for retracing tab clicks (SHIG 81).
+    window.history.replaceState(null, "", value === "overview" ? pathname + search : `#${value}`);
+  }, []);
+  useEffect(() => {
+    const onHashChange = () => setTabState(tabFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
   const [notice, setNotice] = useState<UndoNotice | null>(null);
   const closeNotice = useCallback(() => setNotice(null), []);
   const notify = (message: string, undo: () => Promise<void>) => setNotice({ id: Date.now(), message, undo });
@@ -91,9 +118,17 @@ export function Dashboard() {
   const trimmedCount = rawMonthly.length - monthly.length;
   const defaultBuildingId = selectedBuildingId === "all" ? null : selectedBuildingId;
 
+  // Additions and edits get the same undo notice as deletes, so no change is one-way (SHIG 54, 6).
   async function handleAdd(r: NewReading) {
     const inserted = await insertReading(r);
     setReadings((prev) => [...prev, inserted]);
+    notify(
+      `${UTILITIES[r.utility].label} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を追加しました`,
+      async () => {
+        await deleteReading(inserted.id);
+        setReadings((prev) => prev.filter((x) => x.id !== inserted.id));
+      }
+    );
   }
 
   // Imports can overwrite records; keep what they replace so the notice can put it back (SHIG 54).
@@ -121,8 +156,14 @@ export function Dashboard() {
   }
 
   async function handleUpdate(id: string, patch: Partial<NewReading>) {
+    const before = readings.find((r) => r.id === id);
     const updated = await updateReading(id, patch);
     setReadings((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    if (!before) return;
+    notify("変更を保存しました", async () => {
+      const restored = await updateReading(id, previousValues(before, patch));
+      setReadings((prev) => prev.map((r) => (r.id === id ? restored : r)));
+    });
   }
 
   async function handleAddBuilding(b: NewBuilding) {
@@ -131,8 +172,14 @@ export function Dashboard() {
   }
 
   async function handleUpdateBuilding(id: string, patch: Partial<NewBuilding>) {
+    const before = buildings.find((b) => b.id === id);
     const updated = await updateBuilding(id, patch);
     setBuildings((prev) => prev.map((b) => (b.id === id ? updated : b)));
+    if (!before) return;
+    notify(`建物「${updated.name}」の変更を保存しました`, async () => {
+      const restored = await updateBuilding(id, previousValues(before, patch));
+      setBuildings((prev) => prev.map((b) => (b.id === id ? restored : b)));
+    });
   }
 
   async function handleDeleteBuilding(id: string) {
@@ -178,20 +225,21 @@ export function Dashboard() {
     <div className="space-y-4">
       <BuildingSelector buildings={buildings} value={selectedBuildingId} onChange={setSelectedBuildingId} />
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 sm:inline-flex sm:h-10 sm:w-auto sm:gap-0">
-          <TabsTrigger value="overview" className="w-full sm:w-auto">
+        {/* On phones: three tabs on the first row, two on the second, with no empty slot (SHIG 85). */}
+        <TabsList className="grid h-auto w-full grid-cols-6 gap-1 sm:inline-flex sm:h-10 sm:w-auto sm:gap-0">
+          <TabsTrigger value="overview" className="col-span-2 w-full sm:w-auto">
             料金・総評
           </TabsTrigger>
-          <TabsTrigger value="usage" className="w-full sm:w-auto">
+          <TabsTrigger value="usage" className="col-span-2 w-full sm:w-auto">
             使用量・単価
           </TabsTrigger>
-          <TabsTrigger value="yoy" className="w-full sm:w-auto">
+          <TabsTrigger value="yoy" className="col-span-2 w-full sm:w-auto">
             前年同月比
           </TabsTrigger>
-          <TabsTrigger value="entry" className="w-full sm:w-auto">
+          <TabsTrigger value="entry" className="col-span-3 w-full sm:w-auto">
             取込
           </TabsTrigger>
-          <TabsTrigger value="records" className="w-full sm:w-auto">
+          <TabsTrigger value="records" className="col-span-3 w-full sm:w-auto">
             記録
           </TabsTrigger>
         </TabsList>

@@ -91,7 +91,10 @@ beforeEach(() => {
 });
 
 // Undo spies (window.confirm, URL object URLs, anchor clicks) so they cannot leak into later tests.
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  window.history.replaceState(null, "", window.location.pathname);
+});
 
 describe("Dashboard delete and undo", () => {
   it("deletes a record without a confirm dialog and puts every field back on undo", async () => {
@@ -181,6 +184,44 @@ describe("Dashboard record editor", () => {
     expect(db.readings[0].amountYen).toBe(6500);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /電気 自宅 .* を編集/ }));
   });
+
+  it("puts the previous values back when an edit is undone (SHIG 54)", async () => {
+    await openRecordsTab();
+    fireEvent.click(screen.getByRole("button", { name: /電気 自宅 .* を編集/ }));
+    fireEvent.change(screen.getByLabelText("金額（円）"), { target: { value: "6500" } });
+    fireEvent.change(screen.getByLabelText("メモ"), { target: { value: "" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    });
+    expect(db.readings[0].amountYen).toBe(6500);
+    expect(db.readings[0].note).toBeNull();
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("変更を保存しました");
+
+    await act(async () => {
+      fireEvent.click(within(status).getByRole("button", { name: "元に戻す" }));
+    });
+    expect(db.readings[0].amountYen).toBe(6200);
+    expect(db.readings[0].note).toBe("エアコン");
+    expect(screen.getByRole("button", { name: /電気 自宅 .* 6,200円 を編集/ })).toBeTruthy();
+  });
+
+  it("undoes a building edit (SHIG 54)", async () => {
+    await openRecordsTab();
+    fireEvent.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    fireEvent.change(screen.getByLabelText("名前"), { target: { value: "実家" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    });
+    expect(db.buildings[0].name).toBe("実家");
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("建物「実家」の変更を保存しました");
+    await act(async () => {
+      fireEvent.click(within(status).getByRole("button", { name: "元に戻す" }));
+    });
+    expect(db.buildings[0].name).toBe("自宅");
+    expect(screen.getByRole("button", { name: "自宅 を編集" })).toBeTruthy();
+  });
 });
 
 async function renderLoaded() {
@@ -252,6 +293,30 @@ describe("Dashboard overview", () => {
     expect(screen.getByText("登録済みレコード（2 件）")).toBeTruthy();
   });
 
+  it("opens the tab named in the URL hash and keeps the hash in step (SHIG 59, 76)", async () => {
+    window.location.hash = "#records";
+    const user = await renderLoaded();
+    expect(screen.getByRole("tab", { name: "記録", selected: true })).toBeTruthy();
+
+    await user.click(screen.getByRole("tab", { name: "取込" }));
+    expect(window.location.hash).toBe("#entry");
+    await user.click(screen.getByRole("tab", { name: "料金・総評" }));
+    expect(window.location.hash).toBe("");
+
+    // Editing the address bar (or a hash link) switches the tab too.
+    window.location.hash = "#yoy";
+    await act(async () => {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(screen.getByRole("tab", { name: "前年同月比", selected: true })).toBeTruthy();
+    // An unknown hash falls back to the first tab instead of an empty screen.
+    window.location.hash = "#nope";
+    await act(async () => {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(screen.getByRole("tab", { name: "料金・総評", selected: true })).toBeTruthy();
+  });
+
   it("moves between tabs with the arrow keys", async () => {
     const user = await renderLoaded();
     // Tab past the building selector (すべて, 自宅) into the tab list.
@@ -283,6 +348,27 @@ describe("Dashboard entry", () => {
 
     await user.click(screen.getByRole("tab", { name: "記録" }));
     expect(screen.getByText("登録済みレコード（1 件）")).toBeTruthy();
+  });
+
+  it("offers to undo a manual addition (SHIG 54)", async () => {
+    db.readings = [];
+    const user = await renderLoaded();
+    await user.click(screen.getByRole("tab", { name: "取込" }));
+    await user.click(screen.getByText("手入力"));
+    fireEvent.change(screen.getByLabelText("検針期間（開始）"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText("検針期間（終了）"), { target: { value: "2026-08-31" } });
+    await user.type(screen.getByLabelText("請求額（円・税込）"), "7000");
+    await user.click(screen.getByRole("button", { name: "追加する" }));
+    await screen.findByText("保存しました。");
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("電気 2026/08/01〜08/31 7,000円 を追加しました");
+
+    await act(async () => {
+      fireEvent.click(within(status).getByRole("button", { name: "元に戻す" }));
+    });
+    expect(db.readings).toHaveLength(0);
+    await user.click(screen.getByRole("tab", { name: "記録" }));
+    expect(screen.getByText("登録済みレコード（0 件）")).toBeTruthy();
   });
 
   it("imports a CSV that overwrites a record and undoes the whole import", async () => {

@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SOURCE_LABELS, UTILITIES, type Building, type NewReading, type Reading } from "@/lib/domain";
+import { SOURCE_LABELS, UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Reading, type Utility } from "@/lib/domain";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 import { friendlyError } from "@/lib/errors";
 import { parseLenientNumber } from "@/lib/number";
 import { cn, formatPeriod, formatYen } from "@/lib/utils";
@@ -38,21 +39,45 @@ export function RecordList({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
+  // Finding one utility's bill in years of records should not mean paging through all of them (SHIG 22, 12).
+  const [filter, setFilter] = useState<Utility | "all">("all");
+  const chooseFilter = (f: Utility | "all") => {
+    setFilter(f);
+    setLimit(PAGE_SIZE);
+  };
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   // Closing the editor removes the focused 保存/キャンセル button; hand focus back to the row.
   const closeEditor = (id: string) => {
     setEditingId(null);
     rowButtons.current.get(id)?.focus();
   };
-  const sorted = [...readings].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
+  const sorted = [...readings]
+    .filter((r) => filter === "all" || r.utility === filter)
+    .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
   const shown = sorted.slice(0, limit);
+  const counts = new Map<Utility, number>();
+  for (const r of readings) counts.set(r.utility, (counts.get(r.utility) ?? 0) + 1);
 
-  if (sorted.length === 0) {
+  if (readings.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">まだレコードがありません。</p>;
   }
 
   return (
     <div className="space-y-3">
+      <div role="group" aria-label="種別で絞り込む" className="flex flex-wrap gap-1.5">
+        <ToggleChip pressed={filter === "all"} onClick={() => chooseFilter("all")}>
+          すべて <span className="tabular-nums opacity-70">{readings.length}</span>
+        </ToggleChip>
+        {UTILITY_ORDER.map((u) => (
+          <ToggleChip key={u} pressed={filter === u} color={UTILITIES[u].color} onClick={() => chooseFilter(u)}>
+            {UTILITIES[u].label} <span className="tabular-nums opacity-70">{counts.get(u) ?? 0}</span>
+          </ToggleChip>
+        ))}
+      </div>
+      {sorted.length === 0 && filter !== "all" && (
+        <p className="py-6 text-center text-sm text-muted-foreground">{UTILITIES[filter].label}のレコードはありません。</p>
+      )}
+      {sorted.length > 0 && (
       <div className={cn(ROW_GRID, "hidden px-2 py-2 text-xs text-muted-foreground sm:grid")} aria-hidden>
         <span>種別</span>
         <span>建物</span>
@@ -62,6 +87,7 @@ export function RecordList({
         <span>入力方法</span>
         <span />
       </div>
+      )}
       <ul className="divide-y border-y">
         {shown.map((r) => {
           const meta = UTILITIES[r.utility];

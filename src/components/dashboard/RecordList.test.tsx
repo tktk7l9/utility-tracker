@@ -62,6 +62,37 @@ describe("RecordList", () => {
     expect(screen.queryByRole("button", { name: /もっと見る/ })).toBeNull();
   });
 
+  it("filters by utility with the counts on the chips and resets paging (SHIG 22, 12)", async () => {
+    const many = Array.from({ length: 30 }, (_, i) => reading(i));
+    many[0] = reading(0, { utility: "water" });
+    many[1] = reading(1, { utility: "electricity" });
+    const { user } = setup(many);
+    const rows = () => screen.getAllByRole("button", { name: / を編集$/ });
+    expect(screen.getByRole("group", { name: "種別で絞り込む" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "すべて 30", pressed: true })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "水道 1" }));
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain("水道");
+    expect(screen.queryByRole("button", { name: /もっと見る/ })).toBeNull();
+
+    // A filter with nothing behind it says so instead of showing an empty list.
+    await user.click(screen.getByRole("button", { name: "ガス 28" }));
+    await user.click(screen.getByRole("button", { name: "もっと見る（残り 16 件）" }));
+    expect(rows()).toHaveLength(28);
+    await user.click(screen.getByRole("button", { name: "電気 1" }));
+    expect(rows()).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "ガス 28" }));
+    // Paging starts over when the filter changes.
+    expect(rows()).toHaveLength(12);
+  });
+
+  it("says when the chosen utility has no records", async () => {
+    const { user } = setup([reading(0)]);
+    await user.click(screen.getByRole("button", { name: "電気 0" }));
+    expect(screen.getByText("電気のレコードはありません。")).toBeTruthy();
+  });
+
   it("falls back to the building id when the name is unknown", () => {
     setup([reading(1, { buildingId: "gone" })]);
     expect(screen.getByRole("button", { name: /^ガス gone / })).toBeTruthy();
@@ -114,7 +145,8 @@ describe("RecordList", () => {
 
   it("opens the editor from the keyboard", async () => {
     const { user } = setup([reading(1)]);
-    await user.tab();
+    // Tab past the four filter chips into the list.
+    for (let i = 0; i < 5; i++) await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /ガス 自宅/ }));
     await user.keyboard("{Enter}");
     expect(screen.getByLabelText("金額（円）")).toBeTruthy();

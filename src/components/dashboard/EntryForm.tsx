@@ -118,7 +118,7 @@ export function EntryForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor={`${id}-building`}>建物</Label>
+        <Label htmlFor={`${id}-building`} className="block">建物</Label>
         <select
           id={`${id}-building`}
           className={selectClass}
