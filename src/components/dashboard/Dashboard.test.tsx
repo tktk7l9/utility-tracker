@@ -354,7 +354,7 @@ describe("Dashboard entry", () => {
     db.readings = [];
     const user = await renderLoaded();
     await user.click(screen.getByRole("tab", { name: "取込" }));
-    await user.click(screen.getByText("手入力"));
+    await user.click(screen.getByRole("heading", { name: "手入力" }));
     fireEvent.change(screen.getByLabelText("検針期間（開始）"), { target: { value: "2026-08-01" } });
     fireEvent.change(screen.getByLabelText("検針期間（終了）"), { target: { value: "2026-08-31" } });
     await user.type(screen.getByLabelText("請求額（円・税込）"), "7000");
