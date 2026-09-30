@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { Building, NewReading, Reading } from "@/lib/domain";
@@ -167,7 +167,13 @@ describe("EntryForm", () => {
     const busy = screen.getByRole("button", { name: "保存中…" });
     expect(busy.hasAttribute("disabled")).toBe(true);
     resolve();
-    expect(await screen.findByText("保存しました。")).toBeTruthy();
+    const ok = await screen.findByText("保存しました。");
+    expect(ok.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("groups the utility chips under one name", () => {
+    setup();
+    expect(within(screen.getByRole("group", { name: "種別" })).getAllByRole("button")).toHaveLength(3);
   });
 
   it("submits with the Enter key", async () => {

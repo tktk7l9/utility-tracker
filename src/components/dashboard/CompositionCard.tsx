@@ -23,28 +23,31 @@ export function CompositionCard({ data }: { data: MonthlyBucket[] }) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-4">
-          {/* The list below has the same numbers, so the drawing is hidden from assistive tech and skipped by Tab. */}
-          <div className="relative h-40 w-40 shrink-0" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart accessibilityLayer={false}>
-                <Pie
-                  rootTabIndex={-1}
-                  data={pie}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={48}
-                  outerRadius={72}
-                  paddingAngle={2}
-                  stroke="var(--card)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                >
-                  {pie.map((p) => (
-                    <Cell key={p.key} fill={p.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="relative h-40 w-40 shrink-0">
+            {/* The list below has the same numbers, so only the drawing is hidden from assistive tech and skipped by Tab.
+                The total in the middle is not in the list, so it stays readable. */}
+            <div className="h-full w-full" aria-hidden="true">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart accessibilityLayer={false}>
+                  <Pie
+                    rootTabIndex={-1}
+                    data={pie}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={48}
+                    outerRadius={72}
+                    paddingAngle={2}
+                    stroke="var(--card)"
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                  >
+                    {pie.map((p) => (
+                      <Cell key={p.key} fill={p.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-[10px] text-muted-foreground">合計</span>
               <span className="text-sm font-semibold tabular-nums">{formatYen(grand)}</span>
