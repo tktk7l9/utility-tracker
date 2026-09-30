@@ -60,4 +60,29 @@ describe("SummaryCards", () => {
     render(<SummaryCards monthly={[bucket("2025-06", 8000), bucket("2026-06", 6000)]} onStartImport={() => {}} />);
     expect(screen.getByText(/前年同月比 -2,000円/)).toBeTruthy();
   });
+
+  it("says a utility is not recorded yet instead of showing 0 yen as a drop (SHIG 28, 56)", () => {
+    render(
+      <SummaryCards
+        monthly={[bucket("2025-08", 6000, 2000, 1000), bucket("2026-07", 6000, 2000, 1000), bucket("2026-08", 0, 2200, 1100)]}
+        onStartImport={() => {}}
+      />
+    );
+    expect(screen.getByText("電気は未登録")).toBeTruthy();
+    expect(screen.getByText("3,300円")).toBeTruthy();
+    // An understated total is not compared: no "-5,700円 (-63%)" next to "未登録".
+    expect(screen.queryByText(/前年同月比/)).toBeNull();
+    expect(screen.queryByText(/-5,700円/)).toBeNull();
+    expect(screen.queryByText(/-63\.3%/)).toBeNull();
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    // The electricity card shows the gap, not a 0円 0% figure.
+    const card = screen.getByText("電気").closest("div")!;
+    expect(card.textContent).toContain("まだ記録がありません");
+    expect(card.textContent).not.toContain("0円");
+  });
+
+  it("does not flag a utility that was never recorded", () => {
+    render(<SummaryCards monthly={[bucket("2026-07", 6000), bucket("2026-08", 6000)]} onStartImport={() => {}} />);
+    expect(screen.queryByText(/未登録/)).toBeNull();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planImportUndo, undoImport, withoutId, type ImportUndoApi } from "./undo";
+import { planImportUndo, undoImport, withoutId, type ImportUndoApi, previousValues } from "./undo";
 import { readingKey } from "./csv";
 import type { NewReading, Reading } from "./domain";
 
@@ -19,6 +19,13 @@ const base: NewReading = {
 describe("withoutId", () => {
   it("drops the id and keeps every other field", () => {
     expect(withoutId({ id: "x", ...base })).toEqual(base);
+  });
+});
+
+describe("previousValues", () => {
+  it("returns the old value of every patched field and nothing else", () => {
+    const before = { name: "自宅", movedInOn: "2024-04-01", movedOutOn: null as string | null };
+    expect(previousValues(before, { name: "実家", movedOutOn: "2026-03-31" })).toEqual({ name: "自宅", movedOutOn: null });
   });
 });
 

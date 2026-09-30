@@ -57,7 +57,10 @@ describe("AuthGate", () => {
   it("signs in with the email and password and then shows the content", async () => {
     const user = userEvent.setup();
     render(<AuthGate>ダッシュボード</AuthGate>);
-    await user.type(await screen.findByLabelText("メールアドレス"), "someone@example.com");
+    // The only thing to do on this screen is type the address, so the cursor is already there (SHIG 41, 65).
+    const email = await screen.findByLabelText("メールアドレス");
+    expect(document.activeElement).toBe(email);
+    await user.type(email, "someone@example.com");
     await user.type(screen.getByLabelText("パスワード"), "pw{Enter}");
     expect(supabase.signIn).toHaveBeenCalledWith("someone@example.com", "pw");
 

@@ -16,6 +16,7 @@ import {
   yoyTotals,
   seasonalAverages,
   summarize,
+  missingUtilities,
   periodStats,
   utilityShares,
   totalMetric,
@@ -453,5 +454,28 @@ describe("summarize", () => {
     const s = summarize([bucket("2026-06", 6000)]);
     expect(s.yoyDelta).toBeNull();
     expect(s.yoyPct).toBeNull();
+  });
+});
+
+describe("missingUtilities", () => {
+  it("names the utilities recorded in other months but absent from the given month", () => {
+    const series = [
+      bucket("2026-06", 9000, { electricity: 6000, gas: 2000, water: 1000 }),
+      bucket("2026-07", 3000, { electricity: 0, gas: 2000, water: 1000 }),
+    ];
+    expect(missingUtilities(series, series[1])).toEqual(["electricity"]);
+  });
+
+  it("keeps the display order when several are missing", () => {
+    const series = [
+      bucket("2026-06", 9000, { electricity: 6000, gas: 2000, water: 1000 }),
+      bucket("2026-07", 2000, { electricity: 0, gas: 2000, water: 0 }),
+    ];
+    expect(missingUtilities(series, series[1])).toEqual(["electricity", "water"]);
+  });
+
+  it("ignores utilities that were never recorded (different billing cycles are not gaps)", () => {
+    const series = [bucket("2026-06", 6000), bucket("2026-07", 6000)];
+    expect(missingUtilities(series, series[1])).toEqual([]);
   });
 });

@@ -94,6 +94,9 @@ export function CsvImport({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
+  // Remounting the file input clears the file name it shows once the import is done (SHIG 25).
+  const [inputKey, setInputKey] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   const rows = useMemo(() => parseCsv(rawText), [rawText]);
   const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
@@ -161,11 +164,13 @@ export function CsvImport({
     }
   }
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+  /** Shared by the file input and the drop zone (SHIG 79: drop the downloaded bill straight in). */
+  async function handleFiles(files: File[]) {
     if (files.length === 0) return;
     setDone(null);
     setError(null);
+    // Each file is a fresh decision: a choice made for the last file must not stay ticked while the option is hidden (SHIG 57).
+    setOverwrite(false);
     const pdfCount = files.filter(isPdf).length;
     if (pdfCount > 0 && pdfCount < files.length) {
       setError("CSV と PDF は別々に選んでください。");
@@ -240,6 +245,8 @@ export function CsvImport({
   // In overwrite mode existing keys are not excluded; only in-file duplicates are collapsed (bulkUpsert overwrites via upsert).
   const { toInsert, duplicates } = dedupe(candidates, overwrite ? [] : existingKeys);
   const overwriteCount = overwrite ? toInsert.filter((r) => existingSet.has(readingKey(r))).length : 0;
+  // Overwriting only matters when the file repeats a registered period; the option appears just then (SHIG 67).
+  const canOverwrite = candidates.some((r) => existingSet.has(readingKey(r)));
   // Existing records whose periods overlap without being identical (e.g. old month-based records vs. bills by reading period) would be double-counted.
   const overlaps = findPeriodOverlaps(toInsert, existingReadings);
 
@@ -254,6 +261,7 @@ export function CsvImport({
       setDone(toInsert.length);
       setRawText("");
       setPdfFiles([]);
+      setInputKey((k) => k + 1);
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -264,8 +272,62 @@ export function CsvImport({
   return (
     // On the input tab this sits in a half-width card, so the column count follows this element's width, not the viewport.
     <div className="@container space-y-4">
+      {/* The bill comes first: everything else is decided from it (SHIG 40, 20). */}
+      <div
+        data-testid="drop-zone"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          // Moving over a child fires dragleave on the zone too; only leaving the zone itself ends the highlight.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          void handleFiles(Array.from(e.dataTransfer.files));
+        }}
+        className={`space-y-2 rounded-lg border-2 border-dashed p-4 transition-colors ${
+          dragging ? "border-primary bg-primary/5" : "border-border bg-muted/30"
+        }`}
+      >
+        <Label htmlFor={`${id}-file`} className="text-sm font-medium">
+          CSV / PDF ファイル
+        </Label>
+        <Input
+          key={inputKey}
+          type="file"
+          accept=".csv,text/csv,.pdf,application/pdf"
+          multiple
+          id={`${id}-file`}
+          onChange={(e) => void handleFiles(Array.from(e.target.files ?? []))}
+          className="h-9 bg-background file:mr-3 file:rounded file:bg-secondary file:px-2 file:py-1"
+        />
+        <p className="text-xs text-muted-foreground">
+          ここにドロップしても選べます。PDF は東京電力・エルピオ・東京都水道局の請求書に対応し、複数まとめて選べます（この端末の中だけで読み取ります）。
+        </p>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
-        {mode !== "pdf" && (
+        <div className="space-y-1.5">
+          <Label htmlFor={`${id}-building`} className="block">建物</Label>
+          <select
+            id={`${id}-building`}
+            className={selectClass}
+            value={buildingChoice}
+            onChange={(e) => setBuildingChoice(e.target.value)}
+          >
+            <option value="">自動（期間から判定）</option>
+            {buildings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* PDFs say which utility they are; only a CSV needs the choice (SHIG 67). */}
+        {mode === "csv" && (
           <div className="space-y-1.5">
             <Label id={`${id}-utility-label`}>種別</Label>
             <div className="flex gap-1.5" role="group" aria-labelledby={`${id}-utility-label`}>
@@ -285,37 +347,7 @@ export function CsvImport({
             </div>
           </div>
         )}
-        <div className="space-y-1.5">
-          <Label htmlFor={`${id}-building`}>建物</Label>
-          <select
-            id={`${id}-building`}
-            className={selectClass}
-            value={buildingChoice}
-            onChange={(e) => setBuildingChoice(e.target.value)}
-          >
-            <option value="">自動（期間から判定）</option>
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${id}-file`}>CSV / PDF ファイル</Label>
-          <Input
-            type="file"
-            accept=".csv,text/csv,.pdf,application/pdf"
-            multiple
-            id={`${id}-file`}
-            onChange={onFile}
-            className="h-9 file:mr-3 file:rounded file:bg-secondary file:px-2 file:py-1"
-          />
-        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        PDF は東京電力・エルピオ・東京都水道局の請求書に対応し、複数まとめて選べます（この端末の中だけで読み取ります）。
-      </p>
 
       {/* One always-mounted live region for progress and detection messages, so they are announced. */}
       <div aria-live="polite" className="space-y-1 empty:hidden">
@@ -354,10 +386,6 @@ export function CsvImport({
               </select>
             </div>
           </details>
-          <label className="col-span-full flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
-            既存の同一期間レコードを上書きする（金額の訂正などを再取込する場合）
-          </label>
           <div className="space-y-1">
             <Label htmlFor={`${id}-col-end`}>検針日 / 期間終了列</Label>
             <ColSelect id={`${id}-col-end`} value={colEnd} onChange={(v) => setColEnd(v ?? 0)} maxCols={maxCols} label={headerLabel} />
@@ -393,6 +421,12 @@ export function CsvImport({
             {duplicates.length > 0 && <Badge variant="secondary">重複スキップ {duplicates.length} 件</Badge>}
             {errorCount > 0 && <Badge variant="destructive">エラー {errorCount} 件</Badge>}
           </div>
+          {canOverwrite && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
+              既存の同一期間レコードを上書きする（金額の訂正などを再取込する場合）
+            </label>
+          )}
 
           {overlaps.length > 0 && (
             <div role="alert" className="space-y-1.5 rounded-md border border-warning/60 bg-warning/10 p-3">

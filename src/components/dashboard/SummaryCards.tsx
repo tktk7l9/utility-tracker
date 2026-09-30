@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UTILITIES, UTILITY_ORDER } from "@/lib/domain";
-import { monthLabel, periodStats, summarize, type MonthlyBucket } from "@/lib/aggregate";
+import { missingUtilities, monthLabel, periodStats, summarize, type MonthlyBucket } from "@/lib/aggregate";
 import { formatPercent, formatSignedYen, formatYen } from "@/lib/utils";
 
 function daysInMonth(monthKey: string): number {
@@ -43,11 +43,16 @@ export function SummaryCards({
   // For utility costs, going down is good (green) and going up is a warning (red).
   const trendClass = up ? "text-destructive" : down ? "text-success" : "text-muted-foreground";
 
-  const prevMonth = monthly.length >= 2 ? monthly[monthly.length - 2] : null;
+  // A bill that has not arrived yet is a gap, not a drop to 0円 (SHIG 28, 56, 32).
+  const missing = missingUtilities(monthly, latest);
+  const missingSet = new Set(missing);
+  // With a bill still missing, the total is understated, so a comparison against it would read as a drop (SHIG 28).
+  const comparable = missing.length === 0;
+  const prevMonth = comparable && monthly.length >= 2 ? monthly[monthly.length - 2] : null;
   const momDelta = prevMonth ? latest.total - prevMonth.total : null;
   const momPct = prevMonth && prevMonth.total !== 0 ? (latest.total - prevMonth.total) / prevMonth.total : null;
   const perDay = latest.total / daysInMonth(latestMonth);
-  const vsAvg = latest.total - stats.average;
+  const vsAvg = comparable ? latest.total - stats.average : null;
 
   return (
     <div className="space-y-3">
@@ -55,11 +60,18 @@ export function SummaryCards({
         <CardContent className="p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
             <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">{monthLabel(latestMonth)}の合計</p>
+              <p className="text-sm text-muted-foreground">
+                {monthLabel(latestMonth)}の合計
+                {missing.length > 0 && (
+                  <span className="ml-2 rounded-full border border-warning/60 bg-warning/10 px-2 py-0.5 text-xs text-foreground">
+                    {missing.map((u) => UTILITIES[u].label).join("・")}は未登録
+                  </span>
+                )}
+              </p>
               <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-3xl">
                 {formatYen(latest.total)}
               </p>
-              {yoyDelta != null && (
+              {comparable && yoyDelta != null && (
                 <p className={`mt-1.5 flex items-center gap-1 text-sm ${trendClass}`}>
                   <Trend className="size-4 shrink-0" />
                   前年同月比 {formatSignedYen(yoyDelta)}
@@ -84,29 +96,36 @@ export function SummaryCards({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">月平均比</dt>
-                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">{formatSignedYen(vsAvg)}</dd>
+                <dd className="mt-1 whitespace-nowrap text-sm font-medium tabular-nums sm:text-base">
+                  {vsAvg != null ? formatSignedYen(vsAvg) : "—"}
+                </dd>
               </div>
             </dl>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* One card per utility side by side, so none sits alone on a second row (SHIG 85). */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {UTILITY_ORDER.map((u) => (
           <Card key={u}>
-            <CardContent className="p-4 sm:p-5">
+            <CardContent className="p-3 sm:p-5">
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: UTILITIES[u].color }} />
                 {UTILITIES[u].label}
               </p>
-              <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                <span className="whitespace-nowrap text-xl font-semibold tabular-nums">{formatYen(latest[u])}</span>
-                {latest.total > 0 && (
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {((latest[u] / latest.total) * 100).toFixed(0)}%
-                  </span>
-                )}
-              </p>
+              {missingSet.has(u) ? (
+                <p className="mt-1 text-sm text-muted-foreground">まだ記録がありません</p>
+              ) : (
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                  <span className="whitespace-nowrap text-lg font-semibold tabular-nums sm:text-xl">{formatYen(latest[u])}</span>
+                  {latest.total > 0 && (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {((latest[u] / latest.total) * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </p>
+              )}
               {latest.usage[u] > 0 && (
                 <p className="text-xs text-muted-foreground">
                   {latest.usage[u].toLocaleString("ja-JP", { maximumFractionDigits: 1 })} {UTILITIES[u].unit}

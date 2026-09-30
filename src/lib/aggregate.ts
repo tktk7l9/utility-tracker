@@ -414,3 +414,12 @@ export function summarize(monthly: MonthlyBucket[]): Summary {
     yoyPct,
   };
 }
+
+/**
+ * Utilities that appear somewhere in the series but have no amount in `bucket`.
+ * The summary uses it to say "電気は未登録" instead of showing 0円 as if the cost had dropped (SHIG 28, 56).
+ * Utilities never recorded at all are not gaps (a household may have no gas bill).
+ */
+export function missingUtilities(monthly: MonthlyBucket[], bucket: MonthlyBucket): Utility[] {
+  return UTILITY_ORDER.filter((u) => bucket[u] === 0 && monthly.some((b) => b[u] > 0));
+}
