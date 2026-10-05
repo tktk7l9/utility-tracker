@@ -26,7 +26,7 @@ export default defineConfig({
       thresholds: {
         "src/lib/**": { statements: 100, functions: 100, lines: 100, branches: 100 },
         // UI floor = the level reached when the behavioural UI tests were added, minus 2 points, so it cannot regress.
-        // What stays uncovered is mostly recharts tooltip content (needs real pointer layout) and the unused separator.
+        // What stays uncovered is mostly recharts tooltip content (needs real pointer layout).
         "src/{components,app}/**": { statements: 94, functions: 92, lines: 95, branches: 87 },
       },
     },

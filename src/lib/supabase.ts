@@ -41,7 +41,7 @@ function newBuildingToRow(b: NewBuilding): Omit<BuildingRow, "id"> {
 let client: SupabaseClient | null | undefined;
 
 /** Returns the singleton client when the env vars are set, otherwise null. */
-export function getClient(): SupabaseClient | null {
+function getClient(): SupabaseClient | null {
   if (client !== undefined) return client;
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
@@ -154,7 +154,7 @@ export async function bulkUpsert(readings: NewReading[]): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-const FIELD_TO_COLUMN: Record<keyof NewReading, string> = {
+const FIELD_TO_COLUMN: Record<keyof NewReading, keyof Omit<Row, "id">> = {
   utility: "utility",
   buildingId: "building_id",
   provider: "provider",
