@@ -21,10 +21,14 @@ const CSV_HEADER = [
   "source",
 ] as const;
 
-/** Escapes a CSV cell (quotes it only when it contains a comma, quote or newline). */
+/**
+ * Escapes a CSV cell (quotes it only when it contains a comma, quote or newline).
+ * Text cells starting with =, +, -, @, tab or CR are prefixed with a single quote so that
+ * spreadsheet apps do not evaluate them as formulas (CSV injection). Numbers are left as is.
+ */
 function csvCell(value: string | number | null | undefined): string {
   if (value == null) return "";
-  const s = String(value);
+  const s = typeof value === "string" && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
