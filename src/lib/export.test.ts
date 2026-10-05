@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Building, Reading } from "./domain";
 import { toExportJson, toCsv, exportFilename } from "./export";
 
-const buildings: Building[] = [{ id: "b1", name: "アルカサーノ永山102（現在）", movedInOn: "2024-01-01", movedOutOn: null }];
+const buildings: Building[] = [{ id: "b1", name: "サンプルハイツ101（現在）", movedInOn: "2024-01-01", movedOutOn: null }];
 
 const rows: Reading[] = [
   {
@@ -52,7 +52,7 @@ describe("toCsv", () => {
   });
   it("resolves the building name for normal rows", () => {
     expect(lines[1]).toBe(
-      "electricity,アルカサーノ永山102（現在）,TEPCO,2025-06-17,2025-07-16,23837,663,kWh,,csv"
+      "electricity,サンプルハイツ101（現在）,TEPCO,2025-06-17,2025-07-16,23837,663,kWh,,csv"
     );
   });
   it("falls back to the id for an unknown buildingId; escapes commas/quotes/newlines and leaves null empty", () => {
