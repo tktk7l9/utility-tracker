@@ -37,6 +37,7 @@ scripts/import-*.mjs
 # Cloudflare Workers build output and local state
 .open-next
 .wrangler
+.dev.vars*
 
 # PDF.js CMaps (copied from pdfjs-dist before dev/build and served; required to extract Japanese text from LPIO (エルピオ) bills)
 /public/cmaps

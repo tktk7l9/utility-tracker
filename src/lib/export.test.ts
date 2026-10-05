@@ -61,6 +61,20 @@ describe("toCsv", () => {
       'water,gone,TokyoWaterworks,2025-05-14,2025-07-10,6146,,,"メモ,に""引用""と\n改行",manual'
     );
   });
+  it("neutralizes text cells that a spreadsheet would evaluate as formulas, but leaves numbers alone", () => {
+    const risky: Reading[] = ["=1+1", "+cmd", "-2+3", "@SUM(A1)", "\tx"].map((note, i) => ({
+      ...rows[0],
+      id: `f${i}`,
+      amountYen: -100,
+      note,
+    }));
+    const cells = toCsv(risky, buildings)
+      .split("\r\n")
+      .slice(1)
+      .map((line) => line.split(","));
+    expect(cells.map((c) => c[8])).toEqual(["'=1+1", "'+cmd", "'-2+3", "'@SUM(A1)", "'\tx"]);
+    expect(cells.every((c) => c[5] === "-100")).toBe(true);
+  });
 });
 
 describe("exportFilename", () => {
