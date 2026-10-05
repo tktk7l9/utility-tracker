@@ -2,7 +2,7 @@
 --
 -- Adds the buildings table (name + residence period) and scopes readings
 -- to a building via building_id. Existing records are backfilled by creating a default building
--- 「アルカサーノ永山102（現在）」 per user (the name can be changed in the UI).
+-- 「サンプルハイツ101（現在）」 per user (the name can be changed in the UI).
 --
 -- Note: bulkUpsert's onConflict must also match "user_id,building_id,utility,period_start,period_end"
 --       (src/lib/supabase.ts).
@@ -38,7 +38,7 @@ alter table public.readings
 -- 4) backfill: create a default building per user (guarded so re-running does not duplicate it).
 --    The move-in date is the oldest existing reading start date (today if none). Editable later in the UI.
 insert into public.buildings (name, moved_in_on, user_id)
-select 'アルカサーノ永山102（現在）',
+select 'サンプルハイツ101（現在）',
        coalesce(min(r.period_start), current_date),
        u.id
   from auth.users u
