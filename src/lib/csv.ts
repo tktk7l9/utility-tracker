@@ -8,6 +8,17 @@ import { inferBuilding } from "./buildings";
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /**
+ * Upper bound for one imported file. A year of utility CSVs is a few KB and a bill PDF a few
+ * hundred KB; anything larger is a wrong file, and parsing it in the browser would only freeze the tab.
+ */
+export const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
+
+/** True when a selected file is too large to import (checked before it is read). */
+export function exceedsImportLimit(sizeBytes: number): boolean {
+  return sizeBytes > MAX_IMPORT_BYTES;
+}
+
+/**
  * Minimal CSV parser. Handles double-quoted fields, "" escapes, CRLF/LF and a leading BOM.
  * A trailing newline does not produce an empty row.
  */

@@ -26,6 +26,8 @@ const securityHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+  // No window.open / cross-origin popups are used, so a separate browsing-context group is free
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
 const nextConfig: NextConfig = {

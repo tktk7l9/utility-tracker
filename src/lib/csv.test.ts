@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  MAX_IMPORT_BYTES,
+  exceedsImportLimit,
   parseCsv,
   toHalfWidth,
   normalizeNumber,
@@ -502,5 +504,13 @@ describe("readingKey / dedupe", () => {
       "b2|water|2026-05-01|2026-06-30",
     ]);
     expect(duplicates).toHaveLength(2);
+  });
+});
+
+describe("exceedsImportLimit", () => {
+  it("accepts files up to the limit and refuses anything larger", () => {
+    expect(exceedsImportLimit(0)).toBe(false);
+    expect(exceedsImportLimit(MAX_IMPORT_BYTES)).toBe(false);
+    expect(exceedsImportLimit(MAX_IMPORT_BYTES + 1)).toBe(true);
   });
 });
