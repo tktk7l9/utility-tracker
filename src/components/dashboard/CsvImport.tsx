@@ -8,7 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { UTILITIES, UTILITY_ORDER, type Building, type NewReading, type Reading, type Utility } from "@/lib/domain";
-import { parseCsv, mapRowsToReadings, dedupe, readingKey, guessColumns, guessUtility, type CsvMapping } from "@/lib/csv";
+import {
+  parseCsv,
+  mapRowsToReadings,
+  dedupe,
+  readingKey,
+  guessColumns,
+  guessUtility,
+  exceedsImportLimit,
+  type CsvMapping,
+} from "@/lib/csv";
 import { inferBuilding } from "@/lib/buildings";
 import { parseBillText, type ParsedBill } from "@/lib/pdfBill";
 import { extractPdfText } from "@/lib/pdfText";
@@ -171,6 +180,10 @@ export function CsvImport({
     setError(null);
     // Each file is a fresh decision: a choice made for the last file must not stay ticked while the option is hidden (SHIG 57).
     setOverwrite(false);
+    if (files.some((f) => exceedsImportLimit(f.size))) {
+      setError("ファイルが大きすぎます（1ファイル 20 MB まで）。");
+      return;
+    }
     const pdfCount = files.filter(isPdf).length;
     if (pdfCount > 0 && pdfCount < files.length) {
       setError("CSV と PDF は別々に選んでください。");

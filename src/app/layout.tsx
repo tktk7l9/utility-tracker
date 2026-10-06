@@ -34,7 +34,7 @@ export default function RootLayout({
         <script
           type="module"
           src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon={'{"token": "cd156fbf0fd24da0a12e58fdb4e63828"}'}
+          data-cf-beacon={'{"token": "cd156fbf0fd24da0a12e58fdb4e63828"}' /* gitleaks:allow */}
         />
       </body>
     </html>

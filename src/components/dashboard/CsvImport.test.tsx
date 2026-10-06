@@ -184,6 +184,16 @@ describe("CsvImport with a CSV file", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
+  it("refuses a file over the import size limit before reading it", async () => {
+    const { user, fileInput } = setup();
+    const huge = csvFile(TEPCO_CSV, "huge.csv");
+    Object.defineProperty(huge, "size", { value: 20 * 1024 * 1024 + 1 });
+    huge.arrayBuffer = () => Promise.reject(new Error("must not be read"));
+    await user.upload(fileInput, huge);
+    expect(screen.getByRole("alert").textContent).toBe("ファイルが大きすぎます（1ファイル 20 MB まで）。");
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
   it("refuses CSV and PDF mixed together", async () => {
     const { user, fileInput } = setup();
     await user.upload(fileInput, [csvFile(TEPCO_CSV), pdfFile("x", "bill.pdf")]);
