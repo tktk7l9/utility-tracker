@@ -20,11 +20,17 @@ describe("Home page", () => {
 });
 
 describe("RootLayout", () => {
-  it("renders a Japanese document that keeps search engines out and loads the analytics beacon", () => {
+  it("renders a Japanese document that keeps search engines out", () => {
     const html = renderToStaticMarkup(<RootLayout>本文</RootLayout>);
     expect(html).toContain('<html lang="ja"');
     expect(html).toContain("本文");
-    expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"');
     expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("keeps the analytics beacon out of the HTML (it is appended after hydration)", () => {
+    // An external <script> without integrity in the markup fails the Observatory SRI test,
+    // and the beacon cannot carry integrity (src/components/Analytics.tsx).
+    const html = renderToStaticMarkup(<RootLayout>本文</RootLayout>);
+    expect(html).not.toContain("cloudflareinsights");
   });
 });

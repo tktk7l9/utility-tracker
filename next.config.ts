@@ -1,22 +1,9 @@
 import type { NextConfig } from "next";
+import { contentSecurityPolicy } from "./src/lib/csp";
 
-const isDev = process.env.NODE_ENV === "development";
-
-// Supabase REST/Auth live on <project>.supabase.co, so allow it in connect-src.
-// Allow unsafe-inline for recharts' script/style embedded in the page (no strict nonce yet, since this is
-// assumed to be a personal data terminal). Add unsafe-eval in dev because HMR uses eval.
-const csp = [
-  "default-src 'self'",
-  "img-src 'self' data: blob:",
-  "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com${isDev ? " 'unsafe-eval'" : ""}`,
-  "connect-src 'self' https://*.supabase.co https://cloudflareinsights.com",
-  "font-src 'self' data:",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
+// src/lib/csp.ts is the source of truth for the CSP. In production worker.ts replaces its
+// script-src 'unsafe-inline' with a per-request nonce on every HTML response.
+const csp = contentSecurityPolicy({ dev: process.env.NODE_ENV === "development" });
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },

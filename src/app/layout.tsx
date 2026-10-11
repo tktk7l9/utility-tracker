@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@/components/Analytics";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -28,14 +29,7 @@ export default function RootLayout({
     <html lang="ja" className="h-full antialiased">
       <body className="min-h-full bg-background text-foreground">
         {children}
-        {/* Cloudflare Web Analytics (the token is a public identifier, not a secret) */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts --
-            type="module" scripts are deferred by spec, so they do not block the parser */}
-        <script
-          type="module"
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon={'{"token": "cd156fbf0fd24da0a12e58fdb4e63828"}' /* gitleaks:allow */}
-        />
+        <Analytics />
       </body>
     </html>
   );
