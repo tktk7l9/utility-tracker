@@ -12,7 +12,21 @@ CSV 取込＋手入力で登録し、Supabase にクラウド同期（PC/スマ�
 ## スタック
 
 Next.js 16 (App Router) / React 19 / TypeScript / Tailwind 4 / shadcn(Radix) /
-recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Vercel（`X-Robots-Tag: noindex`）。
+recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Cloudflare Workers（OpenNext・`X-Robots-Tag: noindex`）。
+
+## セキュリティヘッダー（CSP）
+
+- CSP の正本は `src/lib/csp.ts`。`next.config.ts` の `headers()` が Next の全応答に付ける。
+- 本番の HTML はすべて Worker を通る。`wrangler.jsonc` の `main` は `worker.ts` で、`.open-next/worker.js` を包み、
+  `text/html` の応答だけ `script-src` の `'unsafe-inline'` を毎リクエストの `'nonce-…'` に置き換え、
+  インライン `<script>` に同じ nonce を付ける（`src/lib/csp-nonce.ts`・HTMLRewriter でストリーミング）。
+  CSP ヘッダーは置き換えで常に1本。本文が毎回変わるので ETag は外す。
+- `main` を `.open-next/worker.js` に戻すと、画面は動いたまま `'unsafe-inline'` に戻る（`src/lib/worker-entry.test.ts` が落ちる）。
+  `public/` の HTML は Worker を通らずに配信されるので置かない（同じテストが見張る）。
+- `'strict-dynamic'` は付けない。付けると `'self'`（`/_next/static` のチャンク）とビーコンのホスト許可が無視される。
+- Cloudflare Web Analytics のビーコンは HTML に書かず、ハイドレーション後に追加する（`src/components/Analytics.tsx`）。
+  Cloudflare が同じ URL のまま中身を差し替えるため `integrity` は付けない。
+- `next dev` / `next start` は Worker を通らないので、静的な CSP（`'unsafe-inline'`）のまま。
 
 ## セットアップ
 
