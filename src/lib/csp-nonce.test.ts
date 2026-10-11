@@ -4,6 +4,7 @@ import {
   applyScriptNonce,
   createNonce,
   CSP_HEADER,
+  isInlineJavaScript,
   type Rewriter,
   type ScriptElement,
   withScriptNonce,
@@ -30,9 +31,11 @@ function fakeRewriter() {
   return { rewriter: () => rewriter, calls, transformed };
 }
 
+/** A fake <script>. Names are lowercase, as HTMLRewriter reports them. */
 function script(attrs: Record<string, string>) {
   return {
     attrs,
+    getAttribute: (name: string) => (name in attrs ? attrs[name] : null),
     hasAttribute: (name: string) => name in attrs,
     setAttribute(name: string, value: string) {
       attrs[name] = value;
@@ -91,12 +94,73 @@ describe("withScriptNonce", () => {
   });
 });
 
+describe("isInlineJavaScript", () => {
+  it.each<[string, Record<string, string>]>([
+    ["no attributes (Next's own inline scripts)", {}],
+    ["an empty type", { type: "" }],
+    ["text/javascript", { type: "text/javascript" }],
+    ["a JavaScript MIME type in any case", { type: "Application/JavaScript" }],
+    ["a legacy JavaScript MIME type", { type: "text/x-ecmascript" }],
+    ["a type wrapped in ASCII whitespace", { type: " text/javascript\n" }],
+    ["type=module", { type: "module" }],
+    ["type=MODULE", { type: "MODULE" }],
+    ["an empty type that overrides language", { type: "", language: "vbscript" }],
+    ["language=javascript without a type", { language: "JavaScript" }],
+    ["an empty language without a type", { language: "" }],
+    ["nomodule", { nomodule: "" }],
+  ])("stamps %s", (_label, attrs) => {
+    expect(isInlineJavaScript(script(attrs))).toBe(true);
+  });
+
+  it.each<[string, Record<string, string>]>([
+    ["an external script", { src: "/_next/static/chunks/a.js" }],
+    ["an empty src", { src: "" }],
+    ["an external module", { type: "module", src: "/m.js" }],
+    ["an SVG <script href> (SVG 2)", { href: "https://evil.example/x.js" }],
+    ["an SVG <script xlink:href> (SVG 1.1)", { "xlink:href": "https://evil.example/x.js" }],
+    ["application/ld+json (a data block)", { type: "application/ld+json" }],
+    ["application/json", { type: "application/json" }],
+    ["text/plain", { type: "text/plain" }],
+    ["importmap", { type: "importmap" }],
+    ["speculationrules", { type: "speculationrules" }],
+    ["a JavaScript type with parameters (not an essence match)", { type: "text/javascript; charset=utf-8" }],
+    ["a type wrapped in non-ASCII whitespace", { type: "\u00a0text/javascript" }],
+    ["a type spelled with a character reference (arrives raw)", { type: "text&#47;javascript" }],
+    ["language=vbscript without a type", { language: "vbscript" }],
+  ])("does not stamp %s", (_label, attrs) => {
+    expect(isInlineJavaScript(script(attrs))).toBe(false);
+  });
+
+  it("checks each JavaScript MIME type essence of the HTML spec", () => {
+    const essences = [
+      "application/ecmascript",
+      "application/javascript",
+      "application/x-ecmascript",
+      "application/x-javascript",
+      "text/ecmascript",
+      "text/javascript",
+      "text/javascript1.0",
+      "text/javascript1.1",
+      "text/javascript1.2",
+      "text/javascript1.3",
+      "text/javascript1.4",
+      "text/javascript1.5",
+      "text/jscript",
+      "text/livescript",
+      "text/x-ecmascript",
+      "text/x-javascript",
+    ];
+    for (const type of essences) expect(isInlineJavaScript(script({ type })), type).toBe(true);
+    expect(isInlineJavaScript(script({ type: "text/javascript1.6" }))).toBe(false);
+  });
+});
+
 describe("applyScriptNonce", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("swaps the CSP for a nonce one and stamps every inline script", () => {
+  it("swaps the CSP for a nonce one and stamps every inline JavaScript script", () => {
     const fake = fakeRewriter();
     const out = applyScriptNonce(html({ etag: '"x"', "content-length": "31" }), {
       nonce: "N",
@@ -114,13 +178,18 @@ describe("applyScriptNonce", () => {
 
     expect(fake.calls).toHaveLength(1);
     expect(fake.calls[0].selector).toBe("script");
-    // Next's RSC payload pushes, a module script and a JSON data block are all inline.
-    const inline = [script({}), script({ type: "module" }), script({ type: "application/json" })];
+    // Next's RSC payload pushes and a module script are inline JavaScript.
+    const inline = [script({}), script({ type: "module" })];
+    // A JSON data block never runs, so it needs no nonce.
+    const data = script({ type: "application/json" });
     const external = script({ src: "/_next/static/chunks/a.js", async: "" });
-    for (const el of [...inline, external]) fake.calls[0].handler(el);
+    const svgExternal = script({ href: "https://evil.example/x.js" });
+    for (const el of [...inline, data, external, svgExternal]) fake.calls[0].handler(el);
     for (const el of inline) expect(el.attrs.nonce).toBe("N");
+    expect(data.attrs.nonce).toBeUndefined();
     // External scripts are allowed by 'self' / the host allowlist and stay unstamped.
     expect(external.attrs.nonce).toBeUndefined();
+    expect(svgExternal.attrs.nonce).toBeUndefined();
   });
 
   it("keeps the other security headers and exactly one CSP header", () => {
