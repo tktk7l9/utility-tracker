@@ -103,13 +103,19 @@ describe("Dashboard delete and undo", () => {
     expect(screen.getByText("登録済みレコード（1 件）")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /電気 自宅 .* を編集/ }));
+    // In a browser the click (or Enter) that runs 削除 first gives it the focus; fireEvent skips that
+    // step. Since @radix-ui/react-tabs 1.1.22 the clicked tab trigger keeps the focus instead, which
+    // would hide what the delete does with it, so give 削除 the focus a real activation would.
+    const remove = screen.getByRole("button", { name: "削除" });
+    remove.focus();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "削除" }));
+      fireEvent.click(remove);
     });
     expect(confirm).not.toHaveBeenCalled();
     expect(db.readings).toHaveLength(0);
     expect(screen.getByText("登録済みレコード（0 件）")).toBeTruthy();
-    // The deleted row took the focus with it; the undo button receives it.
+    // The delete removed the focused 削除 button with its row; the undo button receives the focus (SHIG 54, 76).
+    expect(remove.isConnected).toBe(false);
     const undo = within(screen.getByRole("status")).getByRole("button", { name: "元に戻す" });
     expect(document.activeElement).toBe(undo);
 
