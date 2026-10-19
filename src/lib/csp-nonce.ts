@@ -169,19 +169,56 @@ export function applyScriptNonce(
     .transform(rewritten);
 }
 
+// Next and OpenNext mark prerendered pages and their RSC payloads `s-maxage=31536000,
+// stale-while-revalidate=2592000`, a header meant for a CDN: Vercel rewrites it for browsers,
+// Workers passes it through. Chrome then serves old RSC payloads from its disk cache for up to
+// 30 days, and after a deploy they name chunk files that no longer exist (404, unstyled page,
+// broken navigation). Browsers get Vercel's value instead: revalidate on every use.
+const CACHE_CONTROL_HEADER = "Cache-Control";
+const BROWSER_CACHE_CONTROL = "public, max-age=0, must-revalidate";
+const SHARED_MAX_AGE = /(^|,)\s*s-maxage\s*=/i;
+
+/**
+ * The Cache-Control a browser should get: a value with the s-maxage directive (a CDN header)
+ * becomes "public, max-age=0, must-revalidate". Every other value is returned unchanged, so
+ * private/no-store responses and the immutable static assets keep theirs; null stays null.
+ */
+export function browserCacheControl(value: string | null): string | null {
+  return value !== null && SHARED_MAX_AGE.test(value) ? BROWSER_CACHE_CONTROL : value;
+}
+
+/**
+ * Applies browserCacheControl to a response. The header is written only when its value changes:
+ * a response without Cache-Control gets none, and an unchanged one is returned as it is.
+ */
+export function applyBrowserCacheControl(response: Response): Response {
+  const value = response.headers.get(CACHE_CONTROL_HEADER);
+  const browser = browserCacheControl(value);
+  if (browser === null || browser === value) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set(CACHE_CONTROL_HEADER, browser);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 /** The fetch handler shape of the OpenNext worker (.open-next/worker.js). */
 export interface FetchWorker {
   fetch(request: Request, env: unknown, ctx: unknown): Response | Promise<Response>;
 }
 
 /**
- * Wraps a Worker so each of its responses goes through applyScriptNonce (a fresh nonce per
- * request). worker.ts uses it around the OpenNext worker.
+ * Wraps a Worker so every one of its responses (HTML, RSC payloads, route handlers) gets a
+ * browser Cache-Control (applyBrowserCacheControl) and then goes through applyScriptNonce (a
+ * fresh nonce per request for HTML). worker.ts uses it around the OpenNext worker.
  */
 export function withScriptNonceWorker(worker: FetchWorker, options: Omit<NonceOptions, "nonce"> = {}): FetchWorker {
   return {
     async fetch(request, env, ctx) {
-      return applyScriptNonce(await worker.fetch(request, env, ctx), options);
+      return applyScriptNonce(applyBrowserCacheControl(await worker.fetch(request, env, ctx)), options);
     },
   };
 }
