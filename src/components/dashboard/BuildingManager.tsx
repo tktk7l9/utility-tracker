@@ -70,7 +70,8 @@ export function BuildingManager({
                     }}
                     type="button"
                     aria-expanded={isEditing}
-                    aria-label={`${b.name} を編集`}
+                    // Every word shown in the row, in screen order, so voice control can say what it sees (WCAG 2.5.3).
+                    aria-label={`${b.name} ${formatPeriod(b.movedInOn, b.movedOutOn)}${isCurrentResidence(b) ? " 現住" : ""} ${count} 件 を編集`}
                     onClick={() => setEditingId(isEditing ? null : b.id)}
                     className={cn(
                       ROW_GRID,
@@ -78,14 +79,19 @@ export function BuildingManager({
                       isEditing && "bg-muted/40"
                     )}
                   >
+                    {/* The spaces between cells render nothing in a grid, but keep the words apart for tools
+                        that read the row as text (axe compares it with aria-label). */}
                     <span className="truncate font-medium sm:font-normal">{b.name}</span>
+                    {" "}
                     <span className="order-3 flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground sm:order-none sm:text-sm">
                       {formatPeriod(b.movedInOn, b.movedOutOn)}
                       {isCurrentResidence(b) && <Badge variant="outline">現住</Badge>}
                     </span>
+                    {" "}
                     <span className="order-2 text-right text-xs text-muted-foreground tabular-nums sm:order-none sm:text-sm">
                       {count} 件
                     </span>
+                    {" "}
                     <ChevronDown
                       aria-hidden
                       className={cn("hidden size-4 text-muted-foreground transition-transform sm:block", isEditing && "rotate-180")}

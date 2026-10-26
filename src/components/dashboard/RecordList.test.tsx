@@ -95,6 +95,15 @@ describe("RecordList", () => {
     expect(screen.queryByRole("list")).toBeNull();
   });
 
+  it("names each row with every word it shows: usage and input method included", () => {
+    setup([reading(0, { usageValue: 12, usageUnit: "m3", source: "csv" }), reading(1)]);
+    const names = screen.getAllByRole("button", { name: / を編集$/ }).map((r) => r.getAttribute("aria-label"));
+    expect(names).toEqual([
+      "ガス 自宅 2020/02/01〜02/28 1,001円 手入力 を編集",
+      "ガス 自宅 2020/01/01〜01/28 1,000円 12 m3 CSV を編集",
+    ]);
+  });
+
   it("falls back to the building id when the name is unknown", () => {
     setup([reading(1, { buildingId: "gone" })]);
     expect(screen.getByRole("button", { name: /^ガス gone / })).toBeTruthy();

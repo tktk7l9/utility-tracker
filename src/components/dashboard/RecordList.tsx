@@ -15,6 +15,9 @@ import { cn, formatPeriod, formatYen } from "@/lib/utils";
 
 /** Records shown at first and added per "もっと見る" (SHIG 36/52: do not render hundreds of rows). */
 const PAGE_SIZE = 12;
+// The count is dimmed beside the label; in a selected chip it only dims to 90%, because white at
+// 70% on the primary blue was 3.5:1, under AA (WCAG 1.4.3).
+const COUNT_CLASS = "tabular-nums opacity-70 in-aria-pressed:opacity-90";
 
 // One grid template for the header and every row, so the columns line up without a <table>.
 // On phones each record becomes a two-line card: "type · building / period" and "amount / usage" (SHIG 82).
@@ -66,11 +69,11 @@ export function RecordList({
     <div className="space-y-3">
       <div role="group" aria-label="種別で絞り込む" className="flex flex-wrap gap-1.5">
         <ToggleChip pressed={filter === "all"} onClick={() => chooseFilter("all")}>
-          すべて <span className="tabular-nums opacity-70">{readings.length}</span>
+          すべて <span className={COUNT_CLASS}>{readings.length}</span>
         </ToggleChip>
         {UTILITY_ORDER.map((u) => (
           <ToggleChip key={u} pressed={filter === u} color={UTILITIES[u].color} onClick={() => chooseFilter(u)}>
-            {UTILITIES[u].label} <span className="tabular-nums opacity-70">{counts.get(u) ?? 0}</span>
+            {UTILITIES[u].label} <span className={COUNT_CLASS}>{counts.get(u) ?? 0}</span>
           </ToggleChip>
         ))}
       </div>
@@ -104,7 +107,8 @@ export function RecordList({
                     }}
                     type="button"
                     aria-expanded={isEditing}
-                    aria-label={`${meta.label} ${buildingName} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)} を編集`}
+                    // Every word shown in the row, in screen order, so voice control can say what it sees (WCAG 2.5.3).
+                    aria-label={`${meta.label} ${buildingName} ${formatPeriod(r.periodStart, r.periodEnd)} ${formatYen(r.amountYen)}${usage ? ` ${usage}` : ""} ${SOURCE_LABELS[r.source]} を編集`}
                     onClick={() => setEditingId(isEditing ? null : r.id)}
                     className={cn(
                       ROW_GRID,
@@ -112,24 +116,32 @@ export function RecordList({
                       isEditing && "bg-muted/40"
                     )}
                   >
+                    {/* The spaces between cells render nothing in a grid, but keep the words apart for tools
+                        that read the row as text (axe compares it with aria-label). */}
                     <span className="order-1 flex min-w-0 items-center gap-1.5 font-medium sm:order-none sm:font-normal">
                       <span className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
                       {meta.label}
                       <span className="truncate font-normal text-muted-foreground sm:hidden">· {buildingName}</span>
                     </span>
+                    {" "}
                     <span className="hidden truncate text-muted-foreground sm:block">{buildingName}</span>
+                    {" "}
                     <span className="order-3 whitespace-nowrap text-xs text-muted-foreground sm:order-none sm:text-sm sm:text-foreground">
                       {formatPeriod(r.periodStart, r.periodEnd)}
                     </span>
+                    {" "}
                     <span className="order-2 text-right font-medium tabular-nums sm:order-none sm:font-normal">
                       {formatYen(r.amountYen)}
                     </span>
+                    {" "}
                     <span className="order-4 text-right text-xs text-muted-foreground tabular-nums sm:order-none sm:text-sm">
                       {usage ?? <span className="hidden sm:inline">—</span>}
                     </span>
+                    {" "}
                     <span className="hidden sm:block">
                       <Badge variant={r.source === "manual" ? "outline" : "secondary"}>{SOURCE_LABELS[r.source]}</Badge>
                     </span>
+                    {" "}
                     <ChevronDown
                       aria-hidden
                       className={cn("hidden size-4 text-muted-foreground transition-transform sm:block", isEditing && "rotate-180")}
