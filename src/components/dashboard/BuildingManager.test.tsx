@@ -33,7 +33,11 @@ describe("BuildingManager list", () => {
   it("lists buildings by move-in date with their record count and a 現住 badge on the current one", () => {
     setup({ buildings: [home, oldHome], counts: [["b1", 3]] });
     const rows = screen.getAllByRole("button", { name: / を編集$/ });
-    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual(["旧居 を編集", "自宅 を編集"]);
+    // The name carries every word shown in the row (WCAG 2.5.3 label in name).
+    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual([
+      "旧居 2020/04/01〜2024/03/31 0 件 を編集",
+      "自宅 2024/04/01〜 現住 3 件 を編集",
+    ]);
     expect(within(rows[1]).getByText("3 件")).toBeTruthy();
     expect(within(rows[1]).getByText("現住")).toBeTruthy();
     expect(within(rows[0]).getByText("0 件")).toBeTruthy();
@@ -47,7 +51,7 @@ describe("BuildingManager list", () => {
 
   it("toggles the editor from the row and reports it with aria-expanded", async () => {
     const { user } = setup();
-    const row = screen.getByRole("button", { name: "自宅 を編集" });
+    const row = screen.getByRole("button", { name: /^自宅 .* を編集$/ });
     await user.click(row);
     expect(row.getAttribute("aria-expanded")).toBe("true");
     expect((screen.getByLabelText("名前") as HTMLInputElement).value).toBe("自宅");
@@ -60,7 +64,7 @@ describe("BuildingManager list", () => {
 describe("BuildingManager editing", () => {
   it("saves trimmed changes, clears an empty move-out date to null and returns focus to the row", async () => {
     const { user, onUpdate } = setup();
-    const row = screen.getByRole("button", { name: "旧居 を編集" });
+    const row = screen.getByRole("button", { name: /^旧居 .* を編集$/ });
     await user.click(row);
     const name = screen.getByLabelText("名前");
     await user.clear(name);
@@ -77,7 +81,7 @@ describe("BuildingManager editing", () => {
     ["退去日（空欄 = 現住）", "2019-01-01", "退去日は入居日以降にしてください。"],
   ])("rejects an invalid %s", async (label, value, message) => {
     const { user, onUpdate } = setup();
-    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
     await user.click(screen.getByRole("button", { name: "保存" }));
     expect(screen.getByRole("alert").textContent).toBe(message);
@@ -86,7 +90,7 @@ describe("BuildingManager editing", () => {
 
   it("saves with Enter from a field", async () => {
     const { user, onUpdate } = setup();
-    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     expect(screen.getByRole("button", { name: "削除" }).getAttribute("type")).toBe("button");
     await user.type(screen.getByLabelText("名前"), "2{Enter}");
     expect(onUpdate).toHaveBeenCalledWith("b0", { name: "旧居2", movedInOn: "2020-04-01", movedOutOn: "2024-03-31" });
@@ -95,7 +99,7 @@ describe("BuildingManager editing", () => {
   it("keeps the editor open with the reason when saving fails", async () => {
     const onUpdate = vi.fn().mockRejectedValue(new Error("保存に失敗しました"));
     const { user } = setup({ onUpdate });
-    await user.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^自宅 .* を編集$/ }));
     await user.click(screen.getByRole("button", { name: "保存" }));
     expect(screen.getByRole("alert").textContent).toBe("保存に失敗しました");
     expect(screen.getByRole("button", { name: "保存" }).hasAttribute("disabled")).toBe(false);
@@ -103,7 +107,7 @@ describe("BuildingManager editing", () => {
 
   it("closes on cancel and returns focus to the row", async () => {
     const { user } = setup();
-    const row = screen.getByRole("button", { name: "自宅 を編集" });
+    const row = screen.getByRole("button", { name: /^自宅 .* を編集$/ });
     await user.click(row);
     await user.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(row.getAttribute("aria-expanded")).toBe("false");
@@ -113,7 +117,7 @@ describe("BuildingManager editing", () => {
   it("deletes an empty building without asking", async () => {
     const confirm = vi.spyOn(window, "confirm");
     const { user, onDelete } = setup();
-    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     await user.click(screen.getByRole("button", { name: "削除" }));
     expect(onDelete).toHaveBeenCalledWith("b0");
     expect(confirm).not.toHaveBeenCalled();
@@ -122,7 +126,7 @@ describe("BuildingManager editing", () => {
 
   it("explains next to the button why a building with records cannot be deleted", async () => {
     const { user, onDelete } = setup({ counts: [["b1", 2]] });
-    await user.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^自宅 .* を編集$/ }));
     await user.click(screen.getByRole("button", { name: "削除" }));
     expect(screen.getByRole("alert").textContent).toContain("記録が 2 件あるため削除できません");
     expect(onDelete).not.toHaveBeenCalled();
@@ -131,7 +135,7 @@ describe("BuildingManager editing", () => {
   it("shows the reason when deleting fails", async () => {
     const onDelete = vi.fn().mockRejectedValue(new Error("削除に失敗しました"));
     const { user } = setup({ onDelete });
-    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     await user.click(screen.getByRole("button", { name: "削除" }));
     expect(screen.getByRole("alert").textContent).toBe("削除に失敗しました");
   });
