@@ -1,7 +1,7 @@
 // Supabase client plus CRUD / auth wrappers for the readings table.
 // The anon key is designed to ship to the client (actual access control is RLS = supabase/rls.sql).
-// Set NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and
-// the Vercel project env. Excluded from coverage as the network layer.
+// Set NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and in the
+// Workers Builds build variables (inlined at build time). Excluded from coverage as the network layer.
 
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import type { Building, NewBuilding, NewReading, Reading, Utility } from "./domain";

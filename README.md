@@ -43,12 +43,17 @@ recharts / Supabase (Postgres + Auth) / Vitest。デプロイは Cloudflare Work
    3. Authentication → Users → Add user で自分のアカウントを作成
    4. `supabase/rls.sql` — RLS を有効化（**実行するまで匿名で誰でも読み書き可能**。必須）
 
-3. 環境変数（`.env.local`。Vercel では Project env に設定）
+3. 環境変数（ローカルは `.env.local`）
 
    ```bash
    cp .env.example .env.local
    # NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を記入
    ```
+
+   `NEXT_PUBLIC_*` はビルド時にクライアントのバンドルへ埋め込まれる。本番は Workers Builds
+   （main への push でビルド・デプロイ）なので、Cloudflare ダッシュボードの Worker →
+   Settings → Build → Variables and secrets（ビルド時の変数）に同じ 2 つを設定する。
+   Worker の実行時の変数（`wrangler secret`）に入れてもクライアントには届かない。
 
 4. 起動
 
