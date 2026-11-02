@@ -135,7 +135,7 @@ describe("Dashboard delete and undo", () => {
     db.buildings.push({ id: "b2", name: "旧居", movedInOn: "2020-04-01", movedOutOn: "2024-03-31" });
     await openRecordsTab();
 
-    fireEvent.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    fireEvent.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "削除" }));
     });
@@ -146,12 +146,12 @@ describe("Dashboard delete and undo", () => {
       fireEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "元に戻す" }));
     });
     expect(db.buildings.map((b) => [b.name, b.movedInOn, b.movedOutOn])).toContainEqual(["旧居", "2020-04-01", "2024-03-31"]);
-    expect(screen.getByRole("button", { name: "旧居 を編集" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^旧居 .* を編集$/ })).toBeTruthy();
   });
 
   it("refuses to delete a building that still has records and says why", async () => {
     await openRecordsTab();
-    fireEvent.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    fireEvent.click(screen.getByRole("button", { name: /^自宅 .* を編集$/ }));
     fireEvent.click(screen.getByRole("button", { name: "削除" }));
     expect(screen.getByRole("alert").textContent).toContain("記録が 1 件あるため削除できません");
     expect(db.buildings).toHaveLength(1);
@@ -209,12 +209,12 @@ describe("Dashboard record editor", () => {
     });
     expect(db.readings[0].amountYen).toBe(6200);
     expect(db.readings[0].note).toBe("エアコン");
-    expect(screen.getByRole("button", { name: /電気 自宅 .* 6,200円 を編集/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /電気 自宅 .* 6,200円 .* を編集/ })).toBeTruthy();
   });
 
   it("undoes a building edit (SHIG 54)", async () => {
     await openRecordsTab();
-    fireEvent.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    fireEvent.click(screen.getByRole("button", { name: /^自宅 .* を編集$/ }));
     fireEvent.change(screen.getByLabelText("名前"), { target: { value: "実家" } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /保存/ }));
@@ -226,7 +226,7 @@ describe("Dashboard record editor", () => {
       fireEvent.click(within(status).getByRole("button", { name: "元に戻す" }));
     });
     expect(db.buildings[0].name).toBe("自宅");
-    expect(screen.getByRole("button", { name: "自宅 を編集" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^自宅 .* を編集$/ })).toBeTruthy();
   });
 });
 
@@ -424,12 +424,12 @@ describe("Dashboard records tab", () => {
   it("renames a building and shows the new name in the selector", async () => {
     const user = await renderLoaded();
     await user.click(screen.getByRole("tab", { name: "記録" }));
-    await user.click(screen.getByRole("button", { name: "自宅 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^自宅 .* を編集$/ }));
     const name = screen.getByLabelText("名前");
     await user.clear(name);
     await user.type(name, "座間の家");
     await user.click(screen.getAllByRole("button", { name: "保存" })[0]);
-    expect(screen.getByRole("button", { name: "座間の家 を編集" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^座間の家 .* を編集$/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^座間の家/, pressed: false })).toBeTruthy();
   });
 
@@ -440,7 +440,7 @@ describe("Dashboard records tab", () => {
     await user.type(screen.getByLabelText("名前"), "新居");
     fireEvent.change(screen.getByLabelText("入居日"), { target: { value: "2027-03-01" } });
     await user.click(screen.getByRole("button", { name: "追加する" }));
-    expect(screen.getByRole("button", { name: "新居 を編集" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^新居 .* を編集$/ })).toBeTruthy();
   });
 
   it("falls back to all buildings when the selected building is deleted", async () => {
@@ -449,7 +449,7 @@ describe("Dashboard records tab", () => {
     const user = await renderLoaded();
     await user.click(screen.getByRole("button", { name: "旧居" }));
     await user.click(screen.getByRole("tab", { name: "記録" }));
-    await user.click(screen.getByRole("button", { name: "旧居 を編集" }));
+    await user.click(screen.getByRole("button", { name: /^旧居 .* を編集$/ }));
     await user.click(screen.getByRole("button", { name: "削除" }));
     expect(screen.getByRole("button", { name: "すべて（合算）" }).getAttribute("aria-pressed")).toBe("true");
   });
